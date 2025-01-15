@@ -5,7 +5,7 @@ interface UseRangeFilterProps<T extends number | Date> {
   min?: T;
   max?: T;
   step?: number;
-  validation?: (range: [T, T]) => boolean;
+  validation?: (range: [T, T]) => boolean | Promise<boolean>;
 }
 
 export const useRangeFilter = <T extends number | Date>({
@@ -19,7 +19,7 @@ export const useRangeFilter = <T extends number | Date>({
   const [isValid, setIsValid] = useState<boolean>(true);
 
   const updateRange = useCallback(
-    (newRange: [T, T] | undefined) => {
+    async (newRange: [T, T] | undefined) => {
       if (!newRange) {
         setRange(undefined);
         setIsValid(true);
@@ -45,10 +45,15 @@ export const useRangeFilter = <T extends number | Date>({
 
       // Apply custom validation if provided
       if (validation) {
-        const validationResult = validation(newRange);
-        setIsValid(validationResult);
+        try {
+          const validationResult = await Promise.resolve(validation(newRange));
+          setIsValid(validationResult);
 
-        if (!validationResult) {
+          if (!validationResult) {
+            return;
+          }
+        } catch (error) {
+          setIsValid(false);
           return;
         }
       }

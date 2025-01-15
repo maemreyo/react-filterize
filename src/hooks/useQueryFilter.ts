@@ -1,22 +1,22 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-interface UseQueryFilterProps {
+interface UseQueryFilterProps<T = string> {
   defaultValue?: string;
   debounce?: number;
-  transform?: (value: string) => any;
-  validation?: (value: string) => boolean;
+  transform?: (value: string) => T;
+  validation?: (value: T) => boolean | Promise<boolean>;
 }
 
-export const useQueryFilter = ({
+export const useQueryFilter = <T = string>({
   defaultValue = '',
   debounce = 300,
   transform,
   validation,
-}: UseQueryFilterProps = {}) => {
+}: UseQueryFilterProps<T> = {}) => {
   const [query, setQuery] = useState<string>(defaultValue);
   const [debouncedQuery, setDebouncedQuery] = useState<string>(defaultValue);
   const [isValid, setIsValid] = useState<boolean>(true);
-  const timeoutRef = useRef<NodeJS.Timeout>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Handle debounced query updates
   useEffect(() => {
@@ -24,8 +24,8 @@ export const useQueryFilter = ({
       clearTimeout(timeoutRef.current);
     }
 
-    timeoutRef.current = setTimeout(() => {
-      let transformedValue = query;
+    timeoutRef.current = setTimeout(async () => {
+      let transformedValue: T | string = query;
 
       // Apply transformation if provided
       if (transform) {
@@ -34,15 +34,22 @@ export const useQueryFilter = ({
 
       // Apply validation if provided
       if (validation) {
-        const validationResult = validation(transformedValue);
-        setIsValid(validationResult);
+        try {
+          const validationResult = await Promise.resolve(
+            validation(transformedValue as T)
+          );
+          setIsValid(validationResult);
 
-        if (!validationResult) {
+          if (!validationResult) {
+            return;
+          }
+        } catch (error) {
+          setIsValid(false);
           return;
         }
       }
 
-      setDebouncedQuery(transformedValue);
+      setDebouncedQuery(query);
     }, debounce);
 
     return () => {

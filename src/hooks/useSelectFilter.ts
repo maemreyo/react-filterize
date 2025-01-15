@@ -1,10 +1,10 @@
 import { useState, useCallback, useMemo } from 'react';
 
 interface UseSelectFilterProps<T> {
-  defaultValue?: T;
+  defaultValue?: T | T[];
   options?: T[];
   isMulti?: boolean;
-  validation?: (value: T | T[]) => boolean;
+  validation?: (value: T | T[]) => boolean | Promise<boolean>;
 }
 
 export const useSelectFilter = <T>({
@@ -16,34 +16,46 @@ export const useSelectFilter = <T>({
   const [selected, setSelected] = useState<T | T[] | undefined>(defaultValue);
   const [isValid, setIsValid] = useState<boolean>(true);
 
+  const validateSelection = useCallback(
+    async (value: T | T[]) => {
+      if (!validation) return true;
+      try {
+        return await Promise.resolve(validation(value));
+      } catch (error) {
+        return false;
+      }
+    },
+    [validation]
+  );
+
   const updateSelection = useCallback(
-    (newValue: T | T[] | undefined) => {
+    async (newValue: T | T[] | undefined) => {
+      if (newValue === undefined) {
+        setSelected(undefined);
+        setIsValid(true);
+        return;
+      }
+
       // Handle multi-select case
       if (isMulti && Array.isArray(newValue)) {
-        if (validation) {
-          const validationResult = validation(newValue);
-          setIsValid(validationResult);
+        const validationResult = await validateSelection(newValue);
+        setIsValid(validationResult);
 
-          if (!validationResult) {
-            return;
-          }
+        if (validationResult) {
+          setSelected(newValue);
         }
-        setSelected(newValue);
       }
       // Handle single-select case
       else if (!isMulti && !Array.isArray(newValue)) {
-        if (validation) {
-          const validationResult = validation(newValue as T);
-          setIsValid(validationResult);
+        const validationResult = await validateSelection(newValue as T);
+        setIsValid(validationResult);
 
-          if (!validationResult) {
-            return;
-          }
+        if (validationResult) {
+          setSelected(newValue);
         }
-        setSelected(newValue);
       }
     },
-    [isMulti, validation]
+    [isMulti, validateSelection]
   );
 
   const clearSelection = useCallback(() => {
@@ -53,75 +65,57 @@ export const useSelectFilter = <T>({
 
   // Helper functions for multi-select
   const addSelection = useCallback(
-    (item: T) => {
+    async (item: T) => {
       if (isMulti) {
-        setSelected(prev => {
-          const prevArray = Array.isArray(prev) ? prev : [];
-          const newSelection = [...prevArray, item];
+        const prevArray = Array.isArray(selected) ? selected : [];
+        const newSelection = [...prevArray, item];
 
-          if (validation) {
-            const validationResult = validation(newSelection);
-            setIsValid(validationResult);
+        const validationResult = await validateSelection(newSelection);
+        setIsValid(validationResult);
 
-            if (!validationResult) {
-              return prev;
-            }
-          }
-
-          return newSelection;
-        });
+        if (validationResult) {
+          setSelected(newSelection);
+        }
       }
     },
-    [isMulti, validation]
+    [isMulti, selected, validateSelection]
   );
 
   const removeSelection = useCallback(
-    (item: T) => {
+    async (item: T) => {
       if (isMulti) {
-        setSelected(prev => {
-          const prevArray = Array.isArray(prev) ? prev : [];
-          const newSelection = prevArray.filter(i => i !== item);
+        const prevArray = Array.isArray(selected) ? selected : [];
+        const newSelection = prevArray.filter(i => i !== item);
 
-          if (validation) {
-            const validationResult = validation(newSelection);
-            setIsValid(validationResult);
+        const validationResult = await validateSelection(newSelection);
+        setIsValid(validationResult);
 
-            if (!validationResult) {
-              return prev;
-            }
-          }
-
-          return newSelection;
-        });
+        if (validationResult) {
+          setSelected(newSelection);
+        }
       }
     },
-    [isMulti, validation]
+    [isMulti, selected, validateSelection]
   );
 
   const toggleSelection = useCallback(
-    (item: T) => {
+    async (item: T) => {
       if (isMulti) {
-        setSelected(prev => {
-          const prevArray = Array.isArray(prev) ? prev : [];
-          const exists = prevArray.includes(item);
-          const newSelection = exists
-            ? prevArray.filter(i => i !== item)
-            : [...prevArray, item];
+        const prevArray = Array.isArray(selected) ? selected : [];
+        const exists = prevArray.includes(item);
+        const newSelection = exists
+          ? prevArray.filter(i => i !== item)
+          : [...prevArray, item];
 
-          if (validation) {
-            const validationResult = validation(newSelection);
-            setIsValid(validationResult);
+        const validationResult = await validateSelection(newSelection);
+        setIsValid(validationResult);
 
-            if (!validationResult) {
-              return prev;
-            }
-          }
-
-          return newSelection;
-        });
+        if (validationResult) {
+          setSelected(newSelection);
+        }
       }
     },
-    [isMulti, validation]
+    [isMulti, selected, validateSelection]
   );
 
   // Computed properties
