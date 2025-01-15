@@ -24,9 +24,12 @@ const AdvancedSearch = () => {
       return ['Item 1', 'Item 2', 'Item 3'];
     },
     options: {
-      syncWithUrl: false,
+      syncWithUrl: true,
       enableAnalytics: false,
       autoFetch: true,
+      storage: {
+        type: 'local',
+      },
     },
   });
 
@@ -52,8 +55,8 @@ const AdvancedSearch = () => {
 
       {/* Results */}
       <div>
-        {data?.map(item => (
-          <div key={item.id}>{/* Render your items */}</div>
+        {data?.map((item, index) => (
+          <div key={index}>{item}</div>
         ))}
       </div>
     </div>

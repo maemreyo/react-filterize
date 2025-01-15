@@ -21,6 +21,11 @@ export const validateFilters = async <T extends FilterTypes>(
         const value = filters[config.key];
         console.log(`Value for key "${config.key}":`, value);
 
+        // Skip validation if filter is not in filters object
+        if (!(config.key in filters)) {
+          return true;
+        }
+
         // Skip validation if value is undefined/null and there's no default
         if (value == null && config.defaultValue == null) {
           console.log(

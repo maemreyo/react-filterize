@@ -14,28 +14,47 @@ export const useFilterize = <T extends FilterTypes>({
   presets,
   groups,
 }: UseFilterizeProps<T>) => {
+  console.log('[useFilterize] Initializing useFilterize hook');
+
   const {
     syncWithUrl = false,
-    storage = { type: 'none' as const },
+    storage = { type: 'session' as const },
     enableAnalytics = false,
     cacheTimeout = 5 * 60 * 1000, // 5 minutes
     autoFetch = true,
   } = options;
 
+  console.log('[useFilterize] Options:', {
+    syncWithUrl,
+    storage,
+    enableAnalytics,
+    cacheTimeout,
+    autoFetch,
+  });
+
   // Initialize storage manager
   const storageManager = useMemo(() => {
+    console.log('[useFilterize] Initializing StorageManager');
     return new StorageManager(storage);
   }, [storage]);
 
   // State management
-  const [filters, setFilters] = useState<Record<string, any>>({});
-  console.log('[useFilterize] filters:', filters);
+  const [filters, setFilters] = useState<Record<string, any>>(() => {
+    if (syncWithUrl) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return deserializeFilters(urlParams.get('filters') || '');
+    }
+    return {};
+  });
+  console.log('[useFilterize] Initial filters state:', filters);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [data, setData] = useState<any>(null);
   const [activeGroups, setActiveGroups] = useState<string[]>([]);
   const [groupStates, setGroupStates] = useState<Record<string, boolean>>(
     () => {
+      console.log('[useFilterize] Initializing groupStates');
       const initialStates: Record<string, boolean> = {};
       if (groups) {
         Object.entries(groups).forEach(([key, group]) => {
@@ -48,12 +67,19 @@ export const useFilterize = <T extends FilterTypes>({
 
   // Load initial state from storage
   useEffect(() => {
+    console.log(
+      '[useFilterize] useEffect - Loading initial state from storage'
+    );
     const loadStoredData = async () => {
+      console.log('[useFilterize] Loading stored data');
       const storedData = await storageManager.load();
       if (storedData) {
+        console.log('[useFilterize] Loaded stored data:', storedData);
         setFilters(storedData.filters);
         setActiveGroups(storedData.activeGroups);
         setGroupStates(storedData.groupStates);
+      } else {
+        console.log('[useFilterize] No stored data found');
       }
     };
 
@@ -62,7 +88,14 @@ export const useFilterize = <T extends FilterTypes>({
 
   // Save state to storage when it changes
   useEffect(() => {
+    console.log('[useFilterize] useEffect - Saving state to storage');
     const saveData = async () => {
+      console.log('[useFilterize] Saving data:', {
+        filters,
+        activeGroups,
+        groupStates,
+        timestamp: Date.now(),
+      });
       await storageManager.save({
         filters,
         activeGroups,
@@ -77,6 +110,7 @@ export const useFilterize = <T extends FilterTypes>({
   // Group management
   const getGroupFilters = useCallback(
     (groupKey: string): string[] => {
+      console.log('[useFilterize] getGroupFilters for group:', groupKey);
       return groups?.[groupKey as any]?.filters || [];
     },
     [groups]
@@ -84,16 +118,21 @@ export const useFilterize = <T extends FilterTypes>({
 
   const toggleGroup = useCallback(
     (groupKey: string) => {
+      console.log('[useFilterize] toggleGroup for group:', groupKey);
       setActiveGroups(prev => {
         const isActive = prev.includes(groupKey);
         if (isActive) {
           // Clear filters in this group
           const groupFilters = getGroupFilters(groupKey);
-          setFilters(prev => {
-            const newFilters = { ...prev };
+          setFilters(prevFilters => {
+            const newFilters = { ...prevFilters };
             groupFilters.forEach(filterKey => {
               delete newFilters[filterKey];
             });
+            console.log(
+              '[useFilterize] Filters after clearing group:',
+              newFilters
+            );
             return newFilters;
           });
           return prev.filter(id => id !== groupKey);
@@ -107,6 +146,7 @@ export const useFilterize = <T extends FilterTypes>({
 
   // Group collapse/expand state management
   const toggleGroupCollapse = useCallback((groupKey: string) => {
+    console.log('[useFilterize] toggleGroupCollapse for group:', groupKey);
     setGroupStates(prev => ({
       ...prev,
       [groupKey]: !prev[groupKey],
@@ -115,6 +155,7 @@ export const useFilterize = <T extends FilterTypes>({
 
   const isGroupCollapsed = useCallback(
     (groupKey: string) => {
+      console.log('[useFilterize] isGroupCollapsed for group:', groupKey);
       return !groupStates[groupKey];
     },
     [groupStates]
@@ -123,6 +164,7 @@ export const useFilterize = <T extends FilterTypes>({
   // Get group metadata
   const getGroupMetadata = useCallback(
     (groupKey: string) => {
+      console.log('[useFilterize] getGroupMetadata for group:', groupKey);
       const group = groups?.[groupKey as any];
       if (!group) return null;
 
@@ -150,6 +192,7 @@ export const useFilterize = <T extends FilterTypes>({
 
   const isGroupActive = useCallback(
     (groupId: string) => {
+      console.log('[useFilterize] isGroupActive for group:', groupId);
       return activeGroups.includes(groupId);
     },
     [activeGroups]
@@ -158,10 +201,15 @@ export const useFilterize = <T extends FilterTypes>({
   // URL synchronization
   useEffect(() => {
     if (syncWithUrl) {
+      console.log('[useFilterize] useEffect - Syncing with URL');
       const urlParams = new URLSearchParams(window.location.search);
       const urlFilters = deserializeFilters(urlParams.get('filters') || '');
       const urlGroups = urlParams.get('groups')?.split(',') || [];
       const urlGroupStates = urlParams.get('groupStates');
+
+      console.log('[useFilterize] URL filters:', urlFilters);
+      console.log('[useFilterize] URL groups:', urlGroups);
+      console.log('[useFilterize] URL groupStates:', urlGroupStates);
 
       setFilters(urlFilters);
       setActiveGroups(urlGroups);
@@ -179,6 +227,7 @@ export const useFilterize = <T extends FilterTypes>({
   // Update synchronization
   const updateFilter = useCallback(
     (key: string, value: any) => {
+      console.log('[useFilterize] updateFilter for key:', key, 'value:', value);
       setFilters(prev => {
         const newFilters = {
           ...prev,
@@ -193,6 +242,7 @@ export const useFilterize = <T extends FilterTypes>({
           window.history.pushState({}, '', `?${urlParams.toString()}`);
         }
 
+        console.log('[useFilterize] Filters after update:', newFilters);
         return newFilters;
       });
     },
@@ -200,98 +250,161 @@ export const useFilterize = <T extends FilterTypes>({
   );
 
   // Data fetching with cache
-  const fetchFilteredData = useCallback(
-    async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  const fetchFilteredData = useCallback(async () => {
+    console.log('[useFilterize] fetchFilteredData');
+    try {
+      setLoading(true);
+      setError(null);
 
-        // Get active filters based on active groups
-        const activeFilters = { ...filters };
-        if (groups) {
-          Object.keys(filters).forEach(key => {
-            const isInActiveGroup = activeGroups.some(groupId =>
-              groups[groupId as any]?.filters.includes(key)
-            );
-            if (!isInActiveGroup) {
-              delete activeFilters[key];
-            }
-          });
-        }
+      // Get active filters based on active groups
+      const activeFilters = { ...filters };
+      console.log('[useFilterize] Active filters:', activeFilters);
+      // if (groups) {
+      //   Object.keys(filters).forEach(key => {
+      //     const isInActiveGroup = activeGroups.some(groupId =>
+      //       groups[groupId as any]?.filters.includes(key)
+      //     );
+      //     if (!isInActiveGroup) {
+      //       delete activeFilters[key];
+      //     }
+      //   });
+      // }
 
-        // Generate cache key
-        const cacheKey = JSON.stringify(activeFilters);
+      console.log('[useFilterize] Active filters for fetching:', activeFilters);
 
-        // Check cache
-        const cachedResult = cache.current.get(cacheKey);
-        if (
-          cachedResult &&
-          Date.now() - cachedResult.timestamp < cacheTimeout
-        ) {
-          setData(cachedResult.data);
-          return;
-        }
+      // Generate cache key
+      const cacheKey = JSON.stringify(activeFilters);
 
-        // Validate filters
-        const isValid = await validateFilters<T>(activeFilters, filtersConfig);
-        if (!isValid) {
-          throw new Error('Invalid filter configuration');
-        }
-
-        // Process dependencies
-        const processedFilters = await Promise.all(
-          Object.entries(activeFilters).map(async ([key, value]) => {
-            const config = filtersConfig.find(c => c.key === key);
-            if (config?.dependencies) {
-              const dependencyResults = await Promise.all(
-                Object.entries(config.dependencies).map(
-                  async ([depKey, processor]) => {
-                    return [depKey, await processor(value)];
-                  }
-                )
-              );
-              return [key, Object.fromEntries(dependencyResults)];
-            }
-            return [key, value];
-          })
-        );
-
-        // Fetch data
-        const result = await fetchData(Object.fromEntries(processedFilters));
-
-        // Update cache
-        cache.current.set(cacheKey, {
-          data: result,
-          timestamp: Date.now(),
-        });
-
-        setData(result);
-
-        // Track analytics if enabled
-        if (enableAnalytics && analytics) {
-          analytics.trackFilterUsage(activeFilters);
-        }
-      } catch (err) {
-        setError(err as Error);
-      } finally {
-        setLoading(false);
+      // Check cache
+      const cachedResult = cache.current.get(cacheKey);
+      if (cachedResult && Date.now() - cachedResult.timestamp < cacheTimeout) {
+        console.log('[useFilterize] Using cached data');
+        setData(cachedResult?.data || {});
+        return;
       }
-    },
-    [
-      // filters,
-      // activeGroups,
-      // groups,
-      // filtersConfig,
-      // fetchData,
-      // cacheTimeout,
-      // enableAnalytics,
-      // analytics,
-    ]
-  );
+
+      // Validate filters
+      const isValid = await validateFilters<T>(activeFilters, filtersConfig);
+      if (!isValid) {
+        throw new Error('Invalid filter configuration');
+      }
+
+      // Process dependencies
+      const processedFilters = await Promise.all(
+        Object.entries(activeFilters).map(async ([key, value]) => {
+          console.log(
+            '[useFilterize] Processing filter:',
+            key,
+            'with value:',
+            value
+          );
+
+          // Tìm cấu hình filter tương ứng
+          const config = filtersConfig.find(c => c.key === key);
+          console.log('[useFilterize] Filter config for', key, ':', config);
+
+          if (config?.dependencies) {
+            console.log(
+              '[useFilterize] Filter',
+              key,
+              'has dependencies:',
+              config.dependencies
+            );
+
+            // Xử lý từng dependency
+            const dependencyResults = await Promise.all(
+              Object.entries(config.dependencies).map(
+                async ([depKey, processor]) => {
+                  console.log(
+                    '[useFilterize] Processing dependency:',
+                    depKey,
+                    'for filter:',
+                    key
+                  );
+
+                  // Gọi processor để xử lý dependency
+                  const processedValue = await processor(value);
+                  console.log(
+                    '[useFilterize] Processed dependency:',
+                    depKey,
+                    'with value:',
+                    processedValue
+                  );
+
+                  return [depKey, processedValue];
+                }
+              )
+            );
+
+            console.log(
+              '[useFilterize] Dependency results for filter',
+              key,
+              ':',
+              dependencyResults
+            );
+
+            // Trả về kết quả sau khi xử lý dependencies
+            const result = [key, Object.fromEntries(dependencyResults)];
+            console.log('[useFilterize] Final processed filter:', result);
+            return result;
+          }
+
+          // Nếu không có dependencies, trả về filter gốc
+          console.log(
+            '[useFilterize] Filter',
+            key,
+            'has no dependencies. Returning original value.'
+          );
+          return [key, value];
+        })
+      );
+
+      console.log('[useFilterize] All processed filters:', processedFilters);
+
+      console.log('[useFilterize] Processed filters:', processedFilters);
+
+      // Fetch data
+      console.log(
+        '[useFilterize] Fetching data with filters:',
+        processedFilters
+      );
+      const result = await fetchData(Object.fromEntries(processedFilters));
+
+      // Update cache
+      cache.current.set(cacheKey, {
+        data: result,
+        timestamp: Date.now(),
+      });
+
+      setData(result);
+
+      // Track analytics if enabled
+      if (enableAnalytics && analytics) {
+        console.log('[useFilterize] Tracking analytics');
+        analytics.trackFilterUsage(activeFilters);
+      }
+    } catch (err) {
+      console.error('[useFilterize] Error fetching data:', err);
+      setError(err as Error);
+    } finally {
+      console.log('[useFilterize] Fetching completed');
+      setLoading(false);
+    }
+  }, [
+    filters,
+    // activeGroups,
+    // groups,
+    // filtersConfig,
+    // fetchData,
+    // cacheTimeout,
+    // enableAnalytics,
+    // analytics,
+  ]);
 
   // Auto-fetch effect
   useEffect(() => {
     if (autoFetch) {
+      console.log('[useFilterize] useEffect - Auto-fetching data');
       fetchFilteredData();
     }
   }, [fetchFilteredData, autoFetch]);
@@ -299,8 +412,10 @@ export const useFilterize = <T extends FilterTypes>({
   // Apply preset filters
   const applyPreset = useCallback(
     (presetKey: string) => {
+      console.log('[useFilterize] applyPreset for preset:', presetKey);
       const presetFilters = getPresetFilters(presetKey, presets);
       if (presetFilters) {
+        console.log('[useFilterize] Applying preset filters:', presetFilters);
         setFilters(prev => ({
           ...prev,
           ...presetFilters,
@@ -312,6 +427,7 @@ export const useFilterize = <T extends FilterTypes>({
 
   // Export filters
   const exportFilters = useCallback(() => {
+    console.log('[useFilterize] exportFilters');
     return {
       filters: serializeFilters(filters),
       groups: activeGroups,
@@ -321,7 +437,9 @@ export const useFilterize = <T extends FilterTypes>({
   // Import filters
   const importFilters = useCallback(
     (data: { filters: string; groups?: string[] }) => {
+      console.log('[useFilterize] importFilters with data:', data);
       const importedFilters = deserializeFilters(data.filters);
+      console.log('[useFilterize] Imported filters:', importedFilters);
       setFilters(importedFilters);
       if (data.groups) {
         setActiveGroups(data.groups);
@@ -332,6 +450,7 @@ export const useFilterize = <T extends FilterTypes>({
 
   // Clear storage
   const clearStorage = useCallback(async () => {
+    console.log('[useFilterize] clearStorage');
     await storageManager.clear();
     setFilters({});
     setActiveGroups([]);
