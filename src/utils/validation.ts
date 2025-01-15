@@ -1,8 +1,8 @@
 import { FilterConfig, FilterTypes } from '../types';
 
-export const validateFilters = async (
+export const validateFilters = async <T extends FilterTypes>(
   filters: Record<string, any>,
-  configs: FilterConfig<FilterTypes>[]
+  configs: FilterConfig<T>[]
 ): Promise<boolean> => {
   try {
     const validationResults = await Promise.all(

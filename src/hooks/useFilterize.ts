@@ -6,15 +6,15 @@ import { useFilterAnalytics } from './useFilterAnalytics';
 import { serializeFilters, deserializeFilters } from '../utils/serialization';
 import { validateFilters } from '../utils/validation';
 import { getPresetFilters } from '../utils/presets';
-import { FilterTypes, UseAdvancedFilterProps } from '../types';
+import { FilterTypes, UseFilterizeProps } from '../types';
 
-export const useAdvancedFilter = <T extends FilterTypes>({
+export const useFilterize = <T extends FilterTypes>({
   filtersConfig,
   fetchData,
   options = {},
   presets,
   groups,
-}: UseAdvancedFilterProps<T>) => {
+}: UseFilterizeProps<T>) => {
   const {
     syncWithUrl = false,
     persistFilters = false,
@@ -127,11 +127,11 @@ export const useAdvancedFilter = <T extends FilterTypes>({
       }
 
       // Validate filters
-      const isValid = await validateFilters(filters, filtersConfig);
+      const isValid = await validateFilters<T>(filters, filtersConfig);
       if (!isValid) {
         throw new Error('Invalid filter configuration');
       }
-
+      
       // Process dependencies
       const processedFilters = await Promise.all(
         Object.entries(filters).map(async ([key, value]) => {

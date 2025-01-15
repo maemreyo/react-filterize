@@ -18,10 +18,10 @@ yarn add @matthew.ngo/react-filter-hooks
 ## Quick Start
 
 ```tsx
-import { useAdvancedFilter } from '@matthew.ngo/react-filter-hooks';
+import { useFilterize } from '@matthew.ngo/react-filter-hooks';
 
 const MyComponent = () => {
-  const { filters, updateFilter, loading, data } = useAdvancedFilter({
+  const { filters, updateFilter, loading, data } = useFilterize({
     filtersConfig: [
       {
         key: 'search',
@@ -101,7 +101,7 @@ const filtersConfig = [
 
 - **Implement proper caching strategies**:
 ```tsx
-const { filters, updateFilter } = useAdvancedFilter({
+const { filters, updateFilter } = useFilterize({
   options: {
     cacheTimeout: 5 * 60 * 1000, // 5 minutes
     persistFilters: true
@@ -128,7 +128,7 @@ const filtersConfig = [
 ### 4. URL Synchronization
 - **Enable URL sync for shareable filters**:
 ```tsx
-const { filters } = useAdvancedFilter({
+const { filters } = useFilterize({
   options: {
     syncWithUrl: true
   }
@@ -140,7 +140,7 @@ const { filters } = useAdvancedFilter({
 ### 1. Advanced Search with Multiple Filter Types
 
 ```tsx
-import { useAdvancedFilter } from '@matthew.ngo/react-filter-hooks';
+import { useFilterize } from '@matthew.ngo/react-filter-hooks';
 
 const AdvancedSearch = () => {
   const {
@@ -149,7 +149,7 @@ const AdvancedSearch = () => {
     loading,
     data,
     filterHooks
-  } = useAdvancedFilter({
+  } = useFilterize({
     filtersConfig: [
       {
         key: 'search',
@@ -240,7 +240,7 @@ const SearchWithAnalytics = () => {
     filters,
     updateFilter,
     analytics
-  } = useAdvancedFilter({
+  } = useFilterize({
     // ... filter config
     options: {
       enableAnalytics: true
@@ -268,11 +268,11 @@ const SearchWithAnalytics = () => {
 
 ## API Reference
 
-### useAdvancedFilter
+### useFilterize
 Main hook for managing filters.
 
 ```tsx
-interface UseAdvancedFilterProps<T extends FilterTypes> {
+interface UseFilterizeProps<T extends FilterTypes> {
   filtersConfig: FilterConfig<T>[];
   fetchData: (filters: Record<string, any>) => Promise<any>;
   options?: {

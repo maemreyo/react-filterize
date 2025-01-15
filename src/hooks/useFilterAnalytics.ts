@@ -1,22 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-
-interface FilterUsageMetrics {
-  count: number;
-  lastUsed: Date;
-  avgDuration: number;
-  totalDuration: number;
-}
-
-interface FilterAnalytics {
-  filterUsage: Record<string, FilterUsageMetrics>;
-  combinations: Record<string, number>;
-  performance: {
-    avgResponseTime: number;
-    totalRequests: number;
-    cacheHitRate: number;
-    totalCacheHits: number;
-  };
-}
+import { FilterAnalytics } from '../types';
 
 export const useFilterAnalytics = () => {
   const [analytics, setAnalytics] = useState<FilterAnalytics>({

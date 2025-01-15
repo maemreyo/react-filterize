@@ -21,9 +21,9 @@ export interface FilterConfig<T extends FilterTypes> {
   defaultValue: FilterTypeToValue[T];
   label?: string;
   debounce?: number;
-  validation?: (value: any) => boolean | Promise<boolean>;
-  dependencies?: Record<string, (value: any) => any>;
-  transform?: (value: any) => any;
+  validation?: (value: FilterTypeToValue[T]) => boolean | Promise<boolean>;
+  dependencies?: Record<string, (value: FilterTypeToValue[T]) => any>;
+  transform?: (value: FilterTypeToValue[T]) => any;
 }
 
 export interface FilterGroup {
@@ -34,7 +34,7 @@ export interface FilterGroup {
   description?: string;
 }
 
-export interface UseAdvancedFilterProps<T extends FilterTypes> {
+export interface UseFilterizeProps<T extends FilterTypes> {
   filtersConfig: FilterConfig<T>[];
   fetchData: (filters: Record<string, any>) => Promise<any>;
   options?: {
@@ -65,4 +65,25 @@ export interface FilterPresets {
 export interface SortConfig {
   key: string;
   direction: 'asc' | 'desc';
+}
+
+// ==============================================
+// ================== Analytics =================
+// ==============================================
+export interface FilterUsageMetrics {
+  count: number;
+  lastUsed: Date;
+  avgDuration: number;
+  totalDuration: number;
+}
+
+export interface FilterAnalytics {
+  filterUsage: Record<string, FilterUsageMetrics>;
+  combinations: Record<string, number>;
+  performance: {
+    avgResponseTime: number;
+    totalRequests: number;
+    cacheHitRate: number;
+    totalCacheHits: number;
+  };
 }
