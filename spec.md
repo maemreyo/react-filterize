@@ -21,8 +21,8 @@ The `@matthew.ngo/react-filter-hooks` package provides a comprehensive solution 
 
 ### 2. Data Handling
 - Efficient data fetching with caching
-- Pagination support
-- Sorting capabilities
+- ~~Pagination support~~ (Pending for now)
+- ~~Sorting capabilities~~ (Pending for now)
 - Data transformation utilities
 - Error handling and retry mechanisms
 

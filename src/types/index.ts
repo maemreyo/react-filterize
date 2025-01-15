@@ -42,6 +42,7 @@ export interface UseFilterizeProps<T extends FilterTypes> {
     persistFilters?: boolean;
     enableAnalytics?: boolean;
     cacheTimeout?: number;
+    autoFetch?: boolean;
   };
   presets?: FilterPresets;
   groups?: FilterGroup[];
