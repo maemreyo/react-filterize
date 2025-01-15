@@ -1,3 +1,5 @@
+import { StorageConfig } from '../storage/types';
+
 export type FilterTypes =
   | 'query'
   | 'select'
@@ -39,10 +41,10 @@ export interface UseFilterizeProps<T extends FilterTypes> {
   fetchData: (filters: Record<string, any>) => Promise<any>;
   options?: {
     syncWithUrl?: boolean;
-    persistFilters?: boolean;
     enableAnalytics?: boolean;
     cacheTimeout?: number;
     autoFetch?: boolean;
+    storage?: StorageConfig;
   };
   presets?: FilterPresets;
   groups?: FilterGroup[];

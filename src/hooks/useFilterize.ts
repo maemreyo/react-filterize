@@ -6,12 +6,8 @@ import { useFilterAnalytics } from './useFilterAnalytics';
 import { serializeFilters, deserializeFilters } from '../utils/serialization';
 import { validateFilters } from '../utils/validation';
 import { getPresetFilters } from '../utils/presets';
-import {
-  FilterTypes,
-  UseFilterizeProps,
-  FilterGroup,
-  FilterTypeToValue,
-} from '../types';
+import { FilterTypes, UseFilterizeProps, FilterTypeToValue } from '../types';
+import { StorageManager } from '../storage/adapters/storageManager';
 
 export const useFilterize = <T extends FilterTypes>({
   filtersConfig,
@@ -22,20 +18,37 @@ export const useFilterize = <T extends FilterTypes>({
 }: UseFilterizeProps<T>) => {
   const {
     syncWithUrl = false,
-    persistFilters = false,
+    storage = { type: 'none' as const },
     enableAnalytics = false,
     cacheTimeout = 5 * 60 * 1000, // 5 minutes
-    autoFetch = true, // New option to control automatic data fetching
+    autoFetch = true,
   } = options;
+
+  // Initialize storage manager
+  const storageManager = useMemo(() => {
+    return new StorageManager(storage);
+  }, [storage]);
+
+  // Load initial state from storage
+  useEffect(() => {
+    const loadStoredData = async () => {
+      const storedData = await storageManager.load();
+      if (storedData) {
+        setFilters(storedData.filters);
+        setActiveGroups(storedData.activeGroups);
+        setGroupStates(storedData.groupStates);
+      }
+    };
+
+    loadStoredData();
+  }, [storageManager]);
 
   // State management
   const [filters, setFilters] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [data, setData] = useState<any>(null);
-  const [activeGroups, setActiveGroups] = useState<string[]>([]); // Track active filter groups
-
-  // State for group UI
+  const [activeGroups, setActiveGroups] = useState<string[]>([]);
   const [groupStates, setGroupStates] = useState<Record<string, boolean>>(
     () => {
       const initialStates: Record<string, boolean> = {};
@@ -47,6 +60,20 @@ export const useFilterize = <T extends FilterTypes>({
       return initialStates;
     }
   );
+
+  // Save state to storage when it changes
+  useEffect(() => {
+    const saveData = async () => {
+      await storageManager.save({
+        filters,
+        activeGroups,
+        groupStates,
+        timestamp: Date.now(),
+      });
+    };
+
+    saveData();
+  }, [filters, activeGroups, groupStates, storageManager]);
 
   // Group management
   const getGroupFilters = useCallback(
@@ -182,29 +209,6 @@ export const useFilterize = <T extends FilterTypes>({
     }
   }, [syncWithUrl]);
 
-  // Local storage
-  useEffect(() => {
-    if (persistFilters) {
-      const savedFilters = localStorage.getItem('advancedFilters');
-      const savedGroups = localStorage.getItem('activeFilterGroups');
-      const savedGroupStates = localStorage.getItem('filterGroupStates');
-
-      if (savedFilters) {
-        setFilters(JSON.parse(savedFilters));
-      }
-      if (savedGroups) {
-        setActiveGroups(JSON.parse(savedGroups));
-      }
-      if (savedGroupStates) {
-        try {
-          setGroupStates(JSON.parse(savedGroupStates));
-        } catch (e) {
-          console.error('Failed to parse saved group states');
-        }
-      }
-    }
-  }, [persistFilters]);
-
   // Update synchronization
   const updateFilter = useCallback(
     (key: string, value: any) => {
@@ -222,22 +226,10 @@ export const useFilterize = <T extends FilterTypes>({
           window.history.pushState({}, '', `?${urlParams.toString()}`);
         }
 
-        if (persistFilters) {
-          localStorage.setItem('advancedFilters', JSON.stringify(newFilters));
-          localStorage.setItem(
-            'activeFilterGroups',
-            JSON.stringify(activeGroups)
-          );
-          localStorage.setItem(
-            'filterGroupStates',
-            JSON.stringify(groupStates)
-          );
-        }
-
         return newFilters;
       });
     },
-    [syncWithUrl, persistFilters, activeGroups, groupStates]
+    [syncWithUrl, activeGroups, groupStates]
   );
 
   // Data fetching with cache
@@ -365,6 +357,14 @@ export const useFilterize = <T extends FilterTypes>({
     []
   );
 
+  // Clear storage
+  const clearStorage = useCallback(async () => {
+    await storageManager.clear();
+    setFilters({});
+    setActiveGroups([]);
+    setGroupStates({});
+  }, [storageManager]);
+
   return {
     filters,
     updateFilter,
@@ -393,5 +393,8 @@ export const useFilterize = <T extends FilterTypes>({
           ),
         }
       : null,
+    storage: {
+      clear: clearStorage,
+    },
   };
 };
