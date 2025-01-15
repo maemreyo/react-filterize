@@ -33,7 +33,7 @@
     "singleQuote": true,
     "trailingComma": "es5"
   },
-  "name": "react-filterize",
+  "name": "@matthew.ngo/react-filterize",
   "description": "A powerful and flexible React hook for managing advanced filtering operations",
   "author": "maemreyo",
   "keywords": [

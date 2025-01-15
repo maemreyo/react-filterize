@@ -1,13 +1,11 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useQueryFilter } from './useQueryFilter';
-import { useRangeFilter } from './useRangeFilter';
-import { useSelectFilter } from './useSelectFilter';
 import { useFilterAnalytics } from './useFilterAnalytics';
 import { serializeFilters, deserializeFilters } from '../utils/serialization';
 import { validateFilters } from '../utils/validation';
 import { getPresetFilters } from '../utils/presets';
 import { FilterTypes, UseFilterizeProps, FilterTypeToValue } from '../types';
 import { StorageManager } from '../storage/adapters/storageManager';
+import useFilterHooks from './useFilterHooks';
 
 export const useFilterize = <T extends FilterTypes>({
   filtersConfig,
@@ -29,22 +27,9 @@ export const useFilterize = <T extends FilterTypes>({
     return new StorageManager(storage);
   }, [storage]);
 
-  // Load initial state from storage
-  useEffect(() => {
-    const loadStoredData = async () => {
-      const storedData = await storageManager.load();
-      if (storedData) {
-        setFilters(storedData.filters);
-        setActiveGroups(storedData.activeGroups);
-        setGroupStates(storedData.groupStates);
-      }
-    };
-
-    loadStoredData();
-  }, [storageManager]);
-
   // State management
   const [filters, setFilters] = useState<Record<string, any>>({});
+  console.log('[useFilterize] filters:', filters);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [data, setData] = useState<any>(null);
@@ -60,6 +45,20 @@ export const useFilterize = <T extends FilterTypes>({
       return initialStates;
     }
   );
+
+  // Load initial state from storage
+  useEffect(() => {
+    const loadStoredData = async () => {
+      const storedData = await storageManager.load();
+      if (storedData) {
+        setFilters(storedData.filters);
+        setActiveGroups(storedData.activeGroups);
+        setGroupStates(storedData.groupStates);
+      }
+    };
+
+    loadStoredData();
+  }, []);
 
   // Save state to storage when it changes
   useEffect(() => {
@@ -146,40 +145,8 @@ export const useFilterize = <T extends FilterTypes>({
   // Analytics
   const analytics = enableAnalytics ? useFilterAnalytics() : null;
 
-  // Initialize specialized hooks for each filter type
-  const filterHooks = useMemo(() => {
-    return filtersConfig.reduce((acc, config) => {
-      switch (config.type) {
-        case 'query':
-          acc[config.key] = useQueryFilter<FilterTypeToValue[T]>({
-            defaultValue: config.defaultValue as string,
-            debounce: config.debounce,
-            transform: config.transform,
-            validation: config.validation,
-          });
-          break;
-        case 'dateRange':
-        case 'numberRange':
-          acc[config.key] = useRangeFilter<FilterTypeToValue[T]>({
-            defaultValue: config.defaultValue as [
-              FilterTypeToValue[T],
-              FilterTypeToValue[T]
-            ],
-            validation: config.validation,
-          });
-          break;
-        case 'select':
-        case 'multiSelect':
-          acc[config.key] = useSelectFilter<FilterTypeToValue[T]>({
-            defaultValue: config.defaultValue,
-            validation: config.validation,
-            isMulti: config.type === 'multiSelect',
-          });
-          break;
-      }
-      return acc;
-    }, {} as Record<string, any>);
-  }, [filtersConfig]);
+  // Initialize filter hooks using useFilterHooks
+  const filterHooks = useFilterHooks(filtersConfig);
 
   const isGroupActive = useCallback(
     (groupId: string) => {
@@ -233,88 +200,94 @@ export const useFilterize = <T extends FilterTypes>({
   );
 
   // Data fetching with cache
-  const fetchFilteredData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  const fetchFilteredData = useCallback(
+    async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-      // Get active filters based on active groups
-      const activeFilters = { ...filters };
-      if (groups) {
-        Object.keys(filters).forEach(key => {
-          const isInActiveGroup = activeGroups.some(groupId =>
-            groups[groupId as any]?.filters.includes(key)
-          );
-          if (!isInActiveGroup) {
-            delete activeFilters[key];
-          }
-        });
-      }
-
-      // Generate cache key
-      const cacheKey = JSON.stringify(activeFilters);
-
-      // Check cache
-      const cachedResult = cache.current.get(cacheKey);
-      if (cachedResult && Date.now() - cachedResult.timestamp < cacheTimeout) {
-        setData(cachedResult.data);
-        return;
-      }
-
-      // Validate filters
-      const isValid = await validateFilters<T>(activeFilters, filtersConfig);
-      if (!isValid) {
-        throw new Error('Invalid filter configuration');
-      }
-
-      // Process dependencies
-      const processedFilters = await Promise.all(
-        Object.entries(activeFilters).map(async ([key, value]) => {
-          const config = filtersConfig.find(c => c.key === key);
-          if (config?.dependencies) {
-            const dependencyResults = await Promise.all(
-              Object.entries(config.dependencies).map(
-                async ([depKey, processor]) => {
-                  return [depKey, await processor(value)];
-                }
-              )
+        // Get active filters based on active groups
+        const activeFilters = { ...filters };
+        if (groups) {
+          Object.keys(filters).forEach(key => {
+            const isInActiveGroup = activeGroups.some(groupId =>
+              groups[groupId as any]?.filters.includes(key)
             );
-            return [key, Object.fromEntries(dependencyResults)];
-          }
-          return [key, value];
-        })
-      );
+            if (!isInActiveGroup) {
+              delete activeFilters[key];
+            }
+          });
+        }
 
-      // Fetch data
-      const result = await fetchData(Object.fromEntries(processedFilters));
+        // Generate cache key
+        const cacheKey = JSON.stringify(activeFilters);
 
-      // Update cache
-      cache.current.set(cacheKey, {
-        data: result,
-        timestamp: Date.now(),
-      });
+        // Check cache
+        const cachedResult = cache.current.get(cacheKey);
+        if (
+          cachedResult &&
+          Date.now() - cachedResult.timestamp < cacheTimeout
+        ) {
+          setData(cachedResult.data);
+          return;
+        }
 
-      setData(result);
+        // Validate filters
+        const isValid = await validateFilters<T>(activeFilters, filtersConfig);
+        if (!isValid) {
+          throw new Error('Invalid filter configuration');
+        }
 
-      // Track analytics if enabled
-      if (enableAnalytics && analytics) {
-        analytics.trackFilterUsage(activeFilters);
+        // Process dependencies
+        const processedFilters = await Promise.all(
+          Object.entries(activeFilters).map(async ([key, value]) => {
+            const config = filtersConfig.find(c => c.key === key);
+            if (config?.dependencies) {
+              const dependencyResults = await Promise.all(
+                Object.entries(config.dependencies).map(
+                  async ([depKey, processor]) => {
+                    return [depKey, await processor(value)];
+                  }
+                )
+              );
+              return [key, Object.fromEntries(dependencyResults)];
+            }
+            return [key, value];
+          })
+        );
+
+        // Fetch data
+        const result = await fetchData(Object.fromEntries(processedFilters));
+
+        // Update cache
+        cache.current.set(cacheKey, {
+          data: result,
+          timestamp: Date.now(),
+        });
+
+        setData(result);
+
+        // Track analytics if enabled
+        if (enableAnalytics && analytics) {
+          analytics.trackFilterUsage(activeFilters);
+        }
+      } catch (err) {
+        setError(err as Error);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      setError(err as Error);
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    filters,
-    activeGroups,
-    groups,
-    filtersConfig,
-    fetchData,
-    cacheTimeout,
-    enableAnalytics,
-    analytics,
-  ]);
+    },
+    [
+      // filters,
+      // activeGroups,
+      // groups,
+      // filtersConfig,
+      // fetchData,
+      // cacheTimeout,
+      // enableAnalytics,
+      // analytics,
+    ]
+  );
 
   // Auto-fetch effect
   useEffect(() => {

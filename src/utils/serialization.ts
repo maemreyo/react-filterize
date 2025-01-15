@@ -1,5 +1,3 @@
-import { FilterTypes, FilterTypeToValue } from '../types';
-
 export const serializeFilters = (filters: Record<string, any>): string => {
   try {
     // Handle special types like Date before serialization
