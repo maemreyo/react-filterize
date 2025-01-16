@@ -261,7 +261,7 @@ const AdvancedSearch = () => {
           </label>
           <input
             type="text"
-            value={filters.search || ''}
+            value={filters.search || '' as any}
             onChange={e => updateFilter('search', e.target.value)}
             placeholder={searchConfig.options?.placeholder}
             maxLength={searchConfig.options?.maxLength}
@@ -333,7 +333,7 @@ const AdvancedSearch = () => {
             {ratingConfig.label}
           </label>
           <select
-            value={filters.rating || '0'}
+            value={filters.rating || '0' as any}
             onChange={e => updateFilter('rating', Number(e.target.value))}
             className="w-full p-2 border rounded"
           >
@@ -351,7 +351,7 @@ const AdvancedSearch = () => {
           </label>
           <select
             multiple
-            value={filters.tags || []}
+            value={filters.tags || [] as any}
             onChange={e =>
               updateFilter(
                 'tags',
