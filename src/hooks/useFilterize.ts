@@ -7,6 +7,9 @@ import {
   RetryConfig,
   ValueTypeKey,
   OutputValueType,
+  FilterConfig,
+  UseFilterizeReturn,
+  FilterValues,
 } from '../types';
 import { StorageManager } from '../storage/adapters/storageManager';
 import { DataTransformer } from '../utils/transform';
@@ -14,11 +17,11 @@ import { useFilterHistory } from './useFilterHistory';
 import { withRetry } from '../utils/retry';
 import { detectCircularDependencies } from '../utils/dependency';
 
-export const useFilterize = <T extends ValueTypeKey>({
+export const useFilterize = <TConfig extends FilterConfig[]>({
   filtersConfig,
   fetchData,
   options = {},
-}: UseFilterizeProps<T>) => {
+}: UseFilterizeProps<TConfig>): UseFilterizeReturn<TConfig> => {
   console.log('[useFilterize] Initializing useFilterize hook');
 
   const {
@@ -55,14 +58,14 @@ export const useFilterize = <T extends ValueTypeKey>({
   }, [storage]);
 
   // State management
-  const [filters, setFilters] = useState<
-    Partial<Record<string, OutputValueType[T]>>
-  >(() => {
+  const [filters, setFilters] = useState<Partial<FilterValues<TConfig>>>(() => {
     if (syncWithUrl) {
       const urlParams = new URLSearchParams(window.location.search);
       const encodedFilters = urlParams.get(urlFiltersKey);
       return encodedFilters
-        ? deserializeFilters(encodedFilters, encodeUrlFilters)
+        ? (deserializeFilters(encodedFilters, encodeUrlFilters) as Partial<
+            FilterValues<TConfig>
+          >)
         : {};
     }
     return {};
@@ -128,7 +131,7 @@ export const useFilterize = <T extends ValueTypeKey>({
     const loadStoredData = async () => {
       const storedData = await storageManager.load();
       if (storedData) {
-        setFilters(storedData.filters);
+        setFilters(storedData.filters as Partial<FilterValues<TConfig>>);
       }
     };
 
@@ -163,15 +166,15 @@ export const useFilterize = <T extends ValueTypeKey>({
       const urlFilters = encodedFilters
         ? deserializeFilters(encodedFilters, encodeUrlFilters)
         : {};
-      setFilters(urlFilters);
+      setFilters(urlFilters as Partial<FilterValues<TConfig>>);
     }
   }, [syncWithUrl, urlFiltersKey, encodeUrlFilters]);
 
   // Update filter change handling
   const updateFilter = useCallback(
-    <K extends string>(
+    <K extends keyof FilterValues<TConfig>>(
       key: K,
-      value: Partial<Record<string, OutputValueType[T]>>[K]
+      value: FilterValues<TConfig>[K]
     ) => {
       setFilters(prev => {
         const newFilters = {
@@ -204,10 +207,7 @@ export const useFilterize = <T extends ValueTypeKey>({
       }
 
       // Validate filters
-      const isValid = await validateFilters<T>(
-        activeFilters as any,
-        filtersConfig
-      );
+      const isValid = await validateFilters(activeFilters, filtersConfig);
       if (!isValid) {
         throw new Error('Invalid filter configuration');
       }
@@ -279,18 +279,14 @@ export const useFilterize = <T extends ValueTypeKey>({
   }, [fetchFilteredData, autoFetch]);
 
   const updateHistoryForFilters = useCallback(
-    (newFilters: Partial<Record<string, OutputValueType[T]>>) => {
+    (newFilters: Partial<FilterValues<TConfig>>) => {
       if (syncWithUrl) {
         const urlParams = new URLSearchParams(window.location.search);
         urlParams.set(
           urlFiltersKey,
           serializeFilters(newFilters, encodeUrlFilters)
         );
-
-        // Construct the new URL with the updated query parameters
         const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
-
-        // Use pushState to update the URL
         window.history.pushState({}, '', newUrl);
       }
     },
@@ -311,7 +307,7 @@ export const useFilterize = <T extends ValueTypeKey>({
         data.filters,
         encodeUrlFilters
       );
-      setFilters(importedFilters);
+      setFilters(importedFilters as Partial<FilterValues<TConfig>>);
     },
     [encodeUrlFilters]
   );

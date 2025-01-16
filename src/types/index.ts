@@ -174,9 +174,23 @@ export interface FilterGroup {
   description?: string;
 }
 
-export interface UseFilterizeProps<T extends ValueTypeKey> {
-  filtersConfig: FilterConfig<T>[];
-  fetchData: (filters: Record<string, any>) => Promise<any>;
+export type ExtractFilterValue<T> = T extends FilterConfig<infer V> ? V : never;
+
+export type FilterOutput<T extends FilterConfig> = T extends FilterConfigWithType<infer Type>
+  ? OutputValueType[Type]
+  : T extends FilterConfigWithoutType<infer Value>
+  ? Value
+  : never;
+
+export type FilterValues<T extends FilterConfig[]> = {
+  [K in T[number] as K['key']]: FilterOutput<K>;
+};
+
+
+
+export interface UseFilterizeProps<TConfig extends FilterConfig[]> {
+  filtersConfig: [...TConfig];
+  fetchData: (filters: Partial<FilterValues<TConfig>>) => Promise<any>;
   options?: {
     syncWithUrl?: boolean;
     urlFiltersKey?: string;
@@ -190,11 +204,25 @@ export interface UseFilterizeProps<T extends ValueTypeKey> {
   };
 }
 
+
 export interface FilterUsageMetrics {
   count: number;
   lastUsed: Date;
   avgDuration: number;
   totalDuration: number;
+}
+
+
+export interface FilterHistory<T> {
+  past: FilterHistoryState<T>[];
+  present: FilterHistoryState<T>;
+  future: FilterHistoryState<T>[];
+}
+
+
+export interface FilterHistoryState<T> {
+  filters: T;
+  timestamp: number;
 }
 
 export interface FilterAnalytics {
@@ -208,16 +236,73 @@ export interface FilterAnalytics {
   };
 }
 
-export interface FilterHistory {
-  past: FilterHistoryState[];
-  present: FilterHistoryState;
-  future: FilterHistoryState[];
+export interface UseFilterAnalyticsReturn<TConfig extends FilterConfig[]> {
+  filterUsage: Record<keyof FilterValues<TConfig>, FilterUsageMetrics>;
+  combinations: Record<string, number>;
+  performance: {
+    avgResponseTime: number;
+    totalRequests: number;
+    cacheHitRate: number;
+    totalCacheHits: number;
+  };
 }
 
-export interface FilterHistoryState {
-  filters: Record<string, any>;
-  timestamp: number;
+export interface UseFilterizeReturn<TConfig extends FilterConfig[]> {
+  // Strongly typed filters object
+  filters: Partial<FilterValues<TConfig>>;
+  
+  // Typed update function
+  updateFilter: <K extends keyof FilterValues<TConfig>>(
+    key: K,
+    value: FilterValues<TConfig>[K]
+  ) => void;
+  
+  // Data fetching states
+  loading: boolean;
+  error: Error | null;
+  data: any;
+  
+  // Export/Import with typed filters
+  exportFilters: () => {
+    filters: string;
+  };
+  importFilters: (data: { 
+    filters: string; 
+    groups?: string[];
+  }) => void;
+  
+  // Analytics with proper typing
+  analytics: {
+    filterUsage: Record<keyof FilterValues<TConfig>, FilterUsageMetrics>;
+    combinations: Record<string, number>;
+    performance: {
+      avgResponseTime: number;
+      totalRequests: number;
+      cacheHitRate: number;
+      totalCacheHits: number;
+    };
+  } | null;
+  
+  // Fetch function
+  fetchData: () => Promise<void>;
+  
+  // Storage operations
+  storage: {
+    clear: () => Promise<void>;
+  };
+  
+  // History management with typed filters
+  history: {
+    undo: () => void;
+    redo: () => void;
+    canUndo: boolean;
+    canRedo: boolean;
+    current: FilterHistoryState<Partial<FilterValues<TConfig>>>;
+    past: FilterHistoryState<Partial<FilterValues<TConfig>>>[];
+    future: FilterHistoryState<Partial<FilterValues<TConfig>>>[];
+  };
 }
+
 
 export interface RetryConfig {
   attempts: number;

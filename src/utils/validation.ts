@@ -1,4 +1,9 @@
-import { FilterConfig, ValueTypeKey, OutputValueType } from '../types';
+import {
+  FilterConfig,
+  ValueTypeKey,
+  OutputValueType,
+  FilterValues,
+} from '../types';
 
 // Helper functions to check specific types
 function isString(value: any): value is string {
@@ -37,14 +42,14 @@ function isFileArray(value: any): value is File[] {
   return Array.isArray(value) && value.every(isFile);
 }
 
-export const validateFilters = async <T extends ValueTypeKey>(
-  filters: Record<string, OutputValueType[T]>,
-  configs: FilterConfig<T>[]
+export const validateFilters = async <TConfig extends FilterConfig[]>(
+  filters: Partial<FilterValues<TConfig>>,
+  configs: [...TConfig]
 ): Promise<boolean> => {
   try {
     const validationResults = await Promise.all(
       configs.map(async config => {
-        const value = filters[config.key];
+        const value = filters[config.key as keyof typeof filters];
 
         // Skip validation if filter is not in filters object
         if (!(config.key in filters)) {
@@ -55,6 +60,7 @@ export const validateFilters = async <T extends ValueTypeKey>(
         if (value == null && config.defaultValue == null) {
           return true;
         }
+
         // @ts-ignore
         return isValidFilterValue(value, config.type);
       })
