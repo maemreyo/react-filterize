@@ -1,13 +1,19 @@
-import React, { useState } from 'react';
+// Filepath: examples/demo/src/App.tsx
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   useFilterize,
+  createFilterConfig,
+  FilterConfig,
+  ValueTypeKey,
 } from '@matthew.ngo/react-filterize';
 
 const mockApi = async (filters: Record<string, any>) => {
+  console.log('[mockApi] Received filters:', filters);
   const delay = Math.random() * 1000 + 500;
   await new Promise(resolve => setTimeout(resolve, delay));
 
-  if (Math.random() < 0.5) {
+  // Simulate potential API failure for demonstration purposes
+  if (filters.simulateFailure) {
     throw new Error('API request failed');
   }
 
@@ -65,7 +71,7 @@ const mockApi = async (filters: Record<string, any>) => {
   ];
 
   // Apply filters
-  return items.filter(item => {
+  const filteredItems = items.filter(item => {
     const searchMatch =
       !filters.search ||
       item.name.toLowerCase().includes(filters.search.toLowerCase());
@@ -93,318 +99,324 @@ const mockApi = async (filters: Record<string, any>) => {
       dateMatch
     );
   });
+
+  console.log('[mockApi] Returning filtered items:', filteredItems);
+  return filteredItems;
 };
 
-const AdvancedSearch = () => {
-  const [apiCalls, setApiCalls] = useState(0);
-
-  // Define filter configurations using createFilterConfig
-  const searchConfig = createFilterConfig({
+// Define filter configurations
+const filtersConfig: FilterConfig<ValueTypeKey>[] = [
+  createFilterConfig({
     key: 'search',
-    outputType: 'string' as const,
+    type: 'string',
     defaultValue: '',
-    label: 'Search Products',
-    description: 'Search by product name',
-    debounce: 300,
-    options: {
-      maxLength: 50,
-      placeholder: 'Search products...',
-    },
-    transform: (value: string) => value.toLowerCase().trim(),
-  });
-
-  const statusConfig = createFilterConfig({
+    label: 'Search by Name',
+  }),
+  createFilterConfig({
     key: 'status',
-    outputType: 'boolean' as const,
-    defaultValue: false,
-    label: 'Product Status',
-    description: 'Filter by product availability',
-  });
-
-  const priceRange = createFilterConfig({
+    type: 'boolean',
+    defaultValue: undefined,
+    label: 'Status',
+  }),
+  createFilterConfig({
     key: 'priceRange',
-    outputType: 'range<number>' as const,
-    defaultValue: [0, 2000],
+    type: 'number[]',
+    defaultValue: [0, 0] as [number, number],
     label: 'Price Range',
-    options: {
-      min: 0,
-      max: 2000,
-      step: 100,
-      marks: [
-        { value: 0, label: '$0' },
-        { value: 1000, label: '$1000' },
-        { value: 2000, label: '$2000' },
-      ],
-    },
-  });
-
-  const ratingConfig = createFilterConfig({
+  }),
+  createFilterConfig({
     key: 'rating',
-    outputType: 'number' as const,
+    type: 'number',
     defaultValue: 0,
     label: 'Minimum Rating',
-    options: {
-      min: 0,
-      max: 5,
-    },
-  });
-
-  const tagsConfig = createFilterConfig({
+  }),
+  createFilterConfig({
     key: 'tags',
-    outputType: 'string[]' as const,
-    defaultValue: [],
-    label: 'Product Tags',
-    options: {
-      maxTags: 5,
-      suggestions: ['electronics', 'mobile', 'audio', 'wearable', 'work'],
-    },
-  });
-
-  const dateRangeConfig = createFilterConfig({
+    type: 'string[]',
+    defaultValue: [] as string[],
+    label: 'Tags',
+  }),
+  createFilterConfig({
     key: 'dateRange',
-    outputType: 'range<date>' as const,
-    defaultValue: [new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), new Date()],
-    label: 'Update Date Range',
-    options: {
-      minDate: new Date(2023, 0, 1),
-      maxDate: new Date(),
-      format: 'yyyy-MM-dd',
-    },
-  });
+    type: 'date[]',
+    defaultValue: [null, null] as [Date | null, Date | null],
+    label: 'Date Range',
+  }),
+  createFilterConfig({
+    key: 'simulateFailure',
+    type: 'boolean',
+    defaultValue: false,
+    label: 'Simulate API Failure',
+  }),
+];
 
-  const filtersConfig: FilterConfig<CoreOutputValueTypes>[] = [
-    searchConfig,
-    statusConfig,
-    priceRange,
-    ratingConfig,
-    tagsConfig,
-    dateRangeConfig,
-  ];
-
+const App: React.FC = () => {
   const {
     filters,
     updateFilter,
     loading,
     error,
     data,
-    history: { undo, redo, canUndo, canRedo },
-    fetchData: refetch,
+    analytics,
+    fetchData,
+    exportFilters,
+    importFilters,
+    storage,
+    history,
   } = useFilterize({
     filtersConfig,
-    fetchData: async filters => {
-      setApiCalls(prev => prev + 1);
-      return mockApi(filters);
-    },
+    fetchData: mockApi,
     options: {
       syncWithUrl: true,
+      storage: {
+        type: 'local',
+        prefix: 'filterize-demo-',
+      },
       enableAnalytics: true,
-      autoFetch: true,
+      autoFetch: false, // Disable auto-fetch to demonstrate manual triggering
       retry: {
         attempts: 3,
         delay: 1000,
         backoff: true,
       },
-      transform: {
-        input: filters => ({
-          ...filters,
-          _t: Date.now(),
-        }),
-        output: data => ({
-          items: data,
-          total: data.length,
-          timestamp: Date.now(),
-        }),
-      },
     },
   });
 
+  const handleInputChange = useCallback(
+    (key: string, type: ValueTypeKey) => (
+      event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    ) => {
+      let value: any;
+
+      switch (type) {
+        case 'string':
+          value = event.target.value;
+          break;
+        case 'number':
+          value = parseFloat(event.target.value) || 0;
+          break;
+        case 'boolean':
+          value =
+            event.target.type === 'checkbox' ? event.target.checked : null;
+          break;
+        case 'number[]':
+          value = filters.priceRange?.slice() || [0, 0];
+          if ((event.target as HTMLInputElement).id.endsWith('-min')) {
+            value[0] = parseFloat(event.target.value) || 0;
+          } else {
+            value[1] = parseFloat(event.target.value) || 0;
+          }
+          break;
+        case 'date[]':
+          value = filters.dateRange?.slice() || [null, null];
+          if ((event.target as HTMLInputElement).id.endsWith('-start')) {
+            value[0] = event.target.value ? new Date(event.target.value) : null;
+          } else {
+            value[1] = event.target.value ? new Date(event.target.value) : null;
+          }
+          break;
+        case 'string[]':
+          value = Array.from(
+            (event.target as HTMLSelectElement).selectedOptions
+          ).map(option => option.value);
+          break;
+        default:
+          value = event.target.value;
+      }
+      updateFilter(key, value);
+    },
+    [filters, updateFilter]
+  );
+
+  const handleFetch = useCallback(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleExport = useCallback(() => {
+    const exportedData = exportFilters();
+    console.log('[Export Filters] Data:', exportedData);
+  }, [exportFilters]);
+
+  const handleImport = useCallback(() => {
+    const input = prompt('Enter exported data:');
+    if (input) {
+      importFilters({ filters: input });
+      console.log('[Import Filters] Data imported.');
+    }
+  }, [importFilters]);
+
+  const handleClearStorage = useCallback(() => {
+    storage.clear();
+    console.log('[Clear Storage] Storage cleared.');
+  }, [storage]);
+
+  const handleResetFilters = useCallback(() => {
+    const resetValues = filtersConfig.reduce(
+      (acc, config) => ({
+        ...acc,
+        [config.key]: config.defaultValue,
+      }),
+      {}
+    );
+    updateFilter('all', resetValues);
+    console.log('[Reset Filters] Filters reset to default.');
+  }, [updateFilter, filtersConfig]);
+
+  const handleUndo = useCallback(() => {
+    history.undo();
+    console.log('[Undo] Last change undone.');
+  }, [history]);
+
+  const handleRedo = useCallback(() => {
+    history.redo();
+    console.log('[Redo] Last change redone.');
+  }, [history]);
+
+  useEffect(() => {
+    if (analytics) {
+      console.log('[Analytics]', analytics.getAnalyticsReport());
+    }
+  }, [analytics]);
+
   return (
-    <div className="p-4 max-w-4xl mx-auto">
-      {/* History Controls */}
-      <div className="mb-4 flex items-center space-x-4">
-        <button
-          onClick={undo}
-          disabled={!canUndo}
-          className={`px-3 py-1 rounded ${
-            canUndo ? 'bg-blue-500 text-white' : 'bg-gray-200'
-          }`}
-        >
-          Undo
-        </button>
-        <button
-          onClick={redo}
-          disabled={!canRedo}
-          className={`px-3 py-1 rounded ${
-            canRedo ? 'bg-blue-500 text-white' : 'bg-gray-200'
-          }`}
-        >
-          Redo
-        </button>
-        <button
-          onClick={refetch}
-          className="px-3 py-1 rounded bg-green-500 text-white"
-        >
-          Refresh
-        </button>
-        <span className="text-sm text-gray-500">API Calls: {apiCalls}</span>
-      </div>
-
-      {/* Filters */}
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        {/* Search */}
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            {searchConfig.label}
-          </label>
-          <input
-            type="text"
-            value={filters.search || '' as any}
-            onChange={e => updateFilter('search', e.target.value)}
-            placeholder={searchConfig.options?.placeholder}
-            maxLength={searchConfig.options?.maxLength}
-            className="w-full p-2 border rounded"
-          />
-        </div>
-
-        {/* Status */}
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            {statusConfig.label}
-          </label>
-          <select
-            value={filters.status === undefined ? '' : String(filters.status)}
-            onChange={e =>
-              updateFilter(
-                'status',
-                e.target.value === '' ? undefined : e.target.value === 'true'
-              )
-            }
-            className="w-full p-2 border rounded"
-          >
-            <option value="">All</option>
-            <option value="true">Available</option>
-            <option value="false">Unavailable</option>
-          </select>
-        </div>
-
-        {/* Price Range */}
-        <div className="col-span-2">
-          <label className="block text-sm font-medium mb-1">
-            {priceRange.label}
-          </label>
-          <div className="flex space-x-4">
-            <input
-              type="number"
-              value={filters.priceRange?.[0] || ''}
-              onChange={e =>
-                updateFilter('priceRange', [
-                  Number(e.target.value),
-                  filters.priceRange?.[1] || 2000,
-                ])
-              }
-              min={priceRange.options?.min}
-              max={priceRange.options?.max}
-              step={priceRange.options?.step}
-              className="w-1/2 p-2 border rounded"
-            />
-            <input
-              type="number"
-              value={filters.priceRange?.[1] || ''}
-              onChange={e =>
-                updateFilter('priceRange', [
-                  filters.priceRange?.[0] || 0,
-                  Number(e.target.value),
-                ])
-              }
-              min={priceRange.options?.min}
-              max={priceRange.options?.max}
-              step={priceRange.options?.step}
-              className="w-1/2 p-2 border rounded"
-            />
-          </div>
-        </div>
-
-        {/* Rating */}
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            {ratingConfig.label}
-          </label>
-          <select
-            value={filters.rating || '0' as any}
-            onChange={e => updateFilter('rating', Number(e.target.value))}
-            className="w-full p-2 border rounded"
-          >
-            <option value="0">Any Rating</option>
-            <option value="3">3+ Stars</option>
-            <option value="4">4+ Stars</option>
-            <option value="4.5">4.5+ Stars</option>
-          </select>
-        </div>
-
-        {/* Tags */}
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            {tagsConfig.label}
-          </label>
-          <select
-            multiple
-            value={filters.tags || [] as any}
-            onChange={e =>
-              updateFilter(
-                'tags',
-                Array.from(e.target.selectedOptions, option => option.value)
-              )
-            }
-            className="w-full p-2 border rounded"
-            size={4}
-          >
-            {Array.isArray((tagsConfig.options as any)?.suggestions) &&
-              (tagsConfig.options as any)?.suggestions.map(tag => (
-                <option key={tag} value={tag}>
-                  {tag}
-                </option>
-              ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Status Messages */}
-      {loading && <div className="text-gray-500">Loading...</div>}
-      {error && <div className="text-red-500 mb-4">Error: {error.message}</div>}
-
-      {/* Results */}
-      <div className="space-y-2">
-        {data?.items.map((item: any) => (
-          <div
-            key={item.id}
-            className="p-3 border rounded flex justify-between items-center"
-          >
-            <div>
-              <div className="font-medium">{item.name}</div>
-              <div className="text-sm text-gray-500">
-                Status: {item.status ? 'Available' : 'Unavailable'}
-                <span className="mx-2">•</span>
-                Rating: {item.rating}
-                <span className="mx-2">•</span>
-                Tags: {item.tags.join(', ')}
-              </div>
-            </div>
-            <div className="font-medium">${item.price}</div>
+    <div style={{ padding: '20px' }}>
+      <h1>Filter Demo</h1>
+      <div>
+        <h2>Filters</h2>
+        {filtersConfig.map(config => (
+          <div key={config.key} style={{ marginBottom: '10px' }}>
+            {config.type === 'boolean' && (
+              <>
+                <input
+                  type="checkbox"
+                  id={config.key}
+                  checked={filters[config.key] ?? config.defaultValue}
+                  onChange={handleInputChange(config.key, config.type)}
+                />
+                <label htmlFor={config.key}>{config.label}</label>
+              </>
+            )}
+            {config.type === 'string' && (
+              <>
+                <label htmlFor={config.key}>{config.label}</label>
+                <input
+                  type="text"
+                  id={config.key}
+                  value={filters[config.key] || ''}
+                  onChange={handleInputChange(config.key, config.type)}
+                />
+              </>
+            )}
+            {config.type === 'number' && (
+              <>
+                <label htmlFor={config.key}>{config.label}</label>
+                <input
+                  type="number"
+                  id={config.key}
+                  value={filters[config.key] || ''}
+                  onChange={handleInputChange(config.key, config.type)}
+                />
+              </>
+            )}
+            {config.type === 'number[]' && (
+              <>
+                <label>{config.label}</label>
+                <input
+                  type="number"
+                  id={`${config.key}-min`}
+                  value={filters.priceRange?.[0] || 0}
+                  onChange={handleInputChange(config.key, config.type)}
+                />
+                <input
+                  type="number"
+                  id={`${config.key}-max`}
+                  value={filters.priceRange?.[1] || 0}
+                  onChange={handleInputChange(config.key, config.type)}
+                />
+              </>
+            )}
+            {config.type === 'string[]' && (
+              <>
+                <label htmlFor={config.key}>{config.label}</label>
+                <select
+                  multiple
+                  id={config.key}
+                  value={filters.tags || []}
+                  onChange={handleInputChange(config.key, config.type)}
+                >
+                  <option value="electronics">Electronics</option>
+                  <option value="work">Work</option>
+                  <option value="mobile">Mobile</option>
+                  <option value="wearable">Wearable</option>
+                  <option value="audio">Audio</option>
+                </select>
+              </>
+            )}
+            {config.type === 'date[]' && (
+              <>
+                <label>{config.label}</label>
+                <input
+                  type="date"
+                  id={`${config.key}-start`}
+                  value={
+                    filters.dateRange?.[0]
+                      ? filters.dateRange[0].toISOString().split('T')[0]
+                      : ''
+                  }
+                  onChange={handleInputChange(config.key, config.type)}
+                />
+                <input
+                  type="date"
+                  id={`${config.key}-end`}
+                  value={
+                    filters.dateRange?.[1]
+                      ? filters.dateRange[1].toISOString().split('T')[0]
+                      : ''
+                  }
+                  onChange={handleInputChange(config.key, config.type)}
+                />
+              </>
+            )}
           </div>
         ))}
-        {data?.items.length === 0 && (
-          <div className="text-gray-500">No results found</div>
-        )}
+        <button onClick={handleFetch} disabled={loading}>
+          {loading ? 'Fetching...' : 'Fetch Data'}
+        </button>
+        <button onClick={handleResetFilters}>Reset Filters</button>
+        <button onClick={handleExport}>Export Filters</button>
+        <button onClick={handleImport}>Import Filters</button>
+        <button onClick={handleClearStorage}>Clear Storage</button>
+        <button onClick={handleUndo} disabled={!history.canUndo}>
+          Undo
+        </button>
+        <button onClick={handleRedo} disabled={!history.canRedo}>
+          Redo
+        </button>
       </div>
 
-      <div className="mt-4 text-sm text-gray-500">
-        Total results: {data?.total || 0}
-        <br />
-        Last updated:{' '}
-        {data?.timestamp ? new Date(data.timestamp).toLocaleString() : 'Never'}
-      </div>
+      {error && (
+        <div style={{ color: 'red' }}>
+          <h2>Error</h2>
+          <p>{error.message}</p>
+        </div>
+      )}
+
+      {data && (
+        <div>
+          <h2>Data</h2>
+          <ul>
+            {data.map((item: any) => (
+              <li key={item.id}>
+                {item.name} - ${item.price} - Rating: {item.rating} - Tags:{' '}
+                {item.tags.join(', ')} - Last Updated:{' '}
+                {item.lastUpdated.toLocaleDateString()}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 };
 
-export default AdvancedSearch;
+export default App;
