@@ -3,11 +3,7 @@ import { useFilterAnalytics } from './useFilterAnalytics';
 import { serializeFilters, deserializeFilters } from '../utils/serialization';
 import { validateFilters } from '../utils/validation';
 import { getPresetFilters } from '../utils/presets';
-import {
-  FilterTypes,
-  UseFilterizeProps,
-  RetryConfig,
-} from '../types';
+import { FilterTypes, UseFilterizeProps, RetryConfig } from '../types';
 import { StorageManager } from '../storage/adapters/storageManager';
 import useFilterHooks from './useFilterHooks';
 import { DataTransformer } from '../utils/transform';
@@ -90,11 +86,12 @@ export const useFilterize = <T extends FilterTypes>({
     }
   );
 
+  // Initialize history management
   const {
     history,
     push: pushHistory,
-    undo,
-    redo,
+    undo: undoHistory,
+    redo: redoHistory,
     canUndo,
     canRedo,
   } = useFilterHistory({
@@ -102,6 +99,51 @@ export const useFilterize = <T extends FilterTypes>({
     activeGroups,
     timestamp: Date.now(),
   });
+
+  // Update history when filters change
+  useEffect(() => {
+    console.log('[useFilterize] Updating history with new filters');
+    pushHistory({
+      filters,
+      activeGroups,
+      timestamp: Date.now(),
+    });
+  }, [filters, activeGroups]);
+
+  // History management methods
+  const undo = useCallback(() => {
+    console.log('[useFilterize] Performing undo operation');
+    undoHistory();
+    const previousState = history.past[history.past.length - 1];
+    if (previousState) {
+      setFilters(previousState.filters);
+      setActiveGroups(previousState.activeGroups);
+
+      if (syncWithUrl) {
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set('filters', serializeFilters(previousState.filters));
+        urlParams.set('groups', previousState.activeGroups.join(','));
+        window.history.pushState({}, '', `?${urlParams.toString()}`);
+      }
+    }
+  }, [history.past, syncWithUrl, undoHistory]);
+
+  const redo = useCallback(() => {
+    console.log('[useFilterize] Performing redo operation');
+    redoHistory();
+    const nextState = history.future[0];
+    if (nextState) {
+      setFilters(nextState.filters);
+      setActiveGroups(nextState.activeGroups);
+
+      if (syncWithUrl) {
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set('filters', serializeFilters(nextState.filters));
+        urlParams.set('groups', nextState.activeGroups.join(','));
+        window.history.pushState({}, '', `?${urlParams.toString()}`);
+      }
+    }
+  }, [history.future, syncWithUrl, redoHistory]);
 
   // Load initial state from storage
   useEffect(() => {
@@ -438,14 +480,21 @@ export const useFilterize = <T extends FilterTypes>({
     []
   );
 
-  // Clear storage
+  // Modified clearStorage to handle history
   const clearStorage = useCallback(async () => {
     console.log('[useFilterize] clearStorage');
     await storageManager.clear();
     setFilters({});
     setActiveGroups([]);
     setGroupStates({});
-  }, [storageManager]);
+
+    // Push empty state to history
+    pushHistory({
+      filters: {},
+      activeGroups: [],
+      timestamp: Date.now(),
+    });
+  }, [storageManager, pushHistory]);
 
   return {
     filters,
@@ -477,6 +526,15 @@ export const useFilterize = <T extends FilterTypes>({
       : null,
     storage: {
       clear: clearStorage,
+    },
+    history: {
+      undo,
+      redo,
+      canUndo,
+      canRedo,
+      current: history.present,
+      past: history.past,
+      future: history.future,
     },
   };
 };

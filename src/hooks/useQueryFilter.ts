@@ -1,42 +1,44 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { QueryOptions, FilterValue } from '../types';
 
-interface UseQueryFilterProps<T = string> {
-  defaultValue?: string;
+interface UseQueryFilterProps {
+  defaultValue: FilterValue<'query'>;
+  options?: QueryOptions;
   debounce?: number;
-  transform?: (value: string) => T;
-  validation?: (value: T) => boolean | Promise<boolean>;
+  validation?: (value: FilterValue<'query'>) => boolean | Promise<boolean>;
+  transform?: (value: FilterValue<'query'>) => any;
 }
 
-export const useQueryFilter = <T = string>({
+export const useQueryFilter = ({
   defaultValue = '',
+  options = {},
   debounce = 300,
   transform,
   validation,
-}: UseQueryFilterProps<T> = {}) => {
-  const [query, setQuery] = useState<string>(defaultValue);
-  const [debouncedQuery, setDebouncedQuery] = useState<string>(defaultValue);
+}: UseQueryFilterProps) => {
+  const [query, setQuery] = useState<FilterValue<'query'>>(defaultValue);
+  const [debouncedQuery, setDebouncedQuery] = useState<FilterValue<'query'>>(
+    defaultValue
+  );
   const [isValid, setIsValid] = useState<boolean>(true);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Handle debounced query updates
   useEffect(() => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
 
     timeoutRef.current = setTimeout(async () => {
-      let transformedValue: T | string = query;
+      let transformedValue = query;
 
-      // Apply transformation if provided
       if (transform) {
         transformedValue = transform(query);
       }
 
-      // Apply validation if provided
       if (validation) {
         try {
           const validationResult = await Promise.resolve(
-            validation(transformedValue as T)
+            validation(transformedValue)
           );
           setIsValid(validationResult);
 
@@ -49,6 +51,12 @@ export const useQueryFilter = <T = string>({
         }
       }
 
+      // Validate against options
+      if (options.maxLength && query.length > options.maxLength) {
+        setIsValid(false);
+        return;
+      }
+
       setDebouncedQuery(query);
     }, debounce);
 
@@ -57,11 +65,12 @@ export const useQueryFilter = <T = string>({
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [query, debounce, transform, validation]);
+  }, [query, debounce, transform, validation, options]);
 
   const clearQuery = useCallback(() => {
     setQuery('');
     setDebouncedQuery('');
+    setIsValid(true);
   }, []);
 
   return {
