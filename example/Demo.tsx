@@ -298,9 +298,9 @@ const AdvancedSearch = () => {
                   filters.priceRange?.[1] || 2000,
                 ])
               }
-              min={Number((filtersConfig[2].options as NumberOptions)?.min)}
-              max={Number(filtersConfig[2].options?.max)}
-              step={Number(filtersConfig[2].options?.step)}
+              min={filtersConfig[2].options?.min}
+              max={filtersConfig[2].options?.max}
+              step={filtersConfig[2].options?.step}
               className="w-1/2 p-2 border rounded"
             />
             <input

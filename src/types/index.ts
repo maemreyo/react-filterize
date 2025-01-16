@@ -24,10 +24,13 @@ export interface OutputValueType {
   'range<number>': RangeValue<number>;
   'range<date>': RangeValue<Date>;
 }
-
 // ==============================================
 // ================= Filter Config ===============
 // ==============================================
+
+export interface BaseFilterOptions extends BaseFilterConfig {
+  options?: unknown;
+}
 
 // Base filter config interface
 export interface BaseFilterConfig {
@@ -42,7 +45,6 @@ export interface BaseFilterConfig {
 
 // This type will be used to simplify other type definitions.
 export type CoreOutputValueTypes = keyof OutputValueType;
-
 
 export type FilterOptionsKeys = keyof FilterOptions;
 
@@ -61,16 +63,33 @@ export type FilterOpts<T extends CoreOutputValueTypes> = AllowedStringOptions<
   ? FilterOptions[AllowedStringOptions<T>]
   : never;
 
-// Enhanced FilterConfig interface with proper type inference
+export type FilterOptionsType<
+  T extends CoreOutputValueTypes
+> = T extends 'string'
+  ? TextOptions | QueryOptions
+  : T extends 'number'
+  ? NumberOptions | SliderOptions
+  : T extends 'boolean'
+  ? undefined
+  : T extends 'date'
+  ? DateRangeOptions
+  : T extends 'string[]'
+  ? SelectOptions<string> | MultiSelectOptions<string> | TagsOptions
+  : T extends 'number[]'
+  ? SelectOptions<number> | MultiSelectOptions<number> | SliderOptions
+  : T extends 'range<number>'
+  ? NumberOptions | SliderOptions
+  : T extends 'range<date>'
+  ? DateRangeOptions
+  : never;
+
 export interface FilterConfig<T extends CoreOutputValueTypes>
   extends BaseFilterConfig {
-  // Instead of filter types, we use output types
   outputType: T;
   defaultValue: OutputValueType[T];
-  // Using mapped type and conditional type to only require `options` for non-boolean filters.
-  options?: FilterOpts<T>;
-  validation?: (value: OutputValueType[T]) => boolean | Promise<boolean>;
+  options?: FilterOptionsType<T>;
   dependencies?: Record<string, (value: OutputValueType[T]) => any>;
+  validation?: (value: OutputValueType[T]) => boolean | Promise<boolean>;
   transform?: (value: OutputValueType[T]) => any;
 }
 
