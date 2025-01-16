@@ -3,10 +3,9 @@ import {
   FilterConfig,
   useFilterize,
   CoreOutputValueTypes,
-  NumberOptions,
+  createFilterConfig,
 } from '@matthew.ngo/react-filterize';
 
-// Mock API với random delay và random failure
 const mockApi = async (filters: Record<string, any>) => {
   const delay = Math.random() * 1000 + 500;
   await new Promise(resolve => setTimeout(resolve, delay));
@@ -102,76 +101,87 @@ const mockApi = async (filters: Record<string, any>) => {
 const AdvancedSearch = () => {
   const [apiCalls, setApiCalls] = useState(0);
 
-  const filtersConfig: FilterConfig<CoreOutputValueTypes>[] = [
-    {
-      key: 'search',
-      outputType: 'string',
-      defaultValue: '',
-      label: 'Search Products',
-      description: 'Search by product name',
-      debounce: 300,
-      options: {
-        maxLength: 50,
-        placeholder: 'Search products...',
-      },
-      transform: (value: string) => value.toLowerCase().trim(),
+  // Define filter configurations using createFilterConfig
+  const searchConfig = createFilterConfig({
+    key: 'search',
+    outputType: 'string' as const,
+    defaultValue: '',
+    label: 'Search Products',
+    description: 'Search by product name',
+    debounce: 300,
+    options: {
+      maxLength: 50,
+      placeholder: 'Search products...',
     },
-    {
-      key: 'status',
-      outputType: 'boolean',
-      defaultValue: false,
-      label: 'Product Status',
-      description: 'Filter by product availability',
-    },
-    {
-      key: 'priceRange',
-      outputType: 'range<number>',
-      defaultValue: [0, 2000],
-      label: 'Price Range',
-      options: {
-        min: 0,
-        max: 2000,
-        step: 100,
-        marks: [
-          { value: 0, label: '$0' },
-          { value: 1000, label: '$1000' },
-          { value: 2000, label: '$2000' },
-        ],
-      },
-    },
-    {
-      key: 'rating',
-      outputType: 'number',
-      defaultValue: 0,
-      label: 'Minimum Rating',
-      options: {
-        max: 5,
-      },
-    },
-    {
-      key: 'tags',
-      outputType: 'string[]',
-      defaultValue: [],
-      label: 'Product Tags',
-      options: {
-        maxTags: 5,
-        suggestions: ['electronics', 'mobile', 'audio', 'wearable', 'work'],
-      },
-    },
-    {
-      key: 'dateRange',
-      outputType: 'range<date>',
-      defaultValue: [
-        new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-        new Date(),
+    transform: (value: string) => value.toLowerCase().trim(),
+  });
+
+  const statusConfig = createFilterConfig({
+    key: 'status',
+    outputType: 'boolean' as const,
+    defaultValue: false,
+    label: 'Product Status',
+    description: 'Filter by product availability',
+  });
+
+  const priceRange = createFilterConfig({
+    key: 'priceRange',
+    outputType: 'range<number>' as const,
+    defaultValue: [0, 2000],
+    label: 'Price Range',
+    options: {
+      min: 0,
+      max: 2000,
+      step: 100,
+      marks: [
+        { value: 0, label: '$0' },
+        { value: 1000, label: '$1000' },
+        { value: 2000, label: '$2000' },
       ],
-      label: 'Update Date Range',
-      options: {
-        minDate: new Date(2023, 0, 1),
-        maxDate: new Date(),
-        format: 'yyyy-MM-dd',
-      },
     },
+  });
+
+  const ratingConfig = createFilterConfig({
+    key: 'rating',
+    outputType: 'number' as const,
+    defaultValue: 0,
+    label: 'Minimum Rating',
+    options: {
+      min: 0,
+      max: 5,
+    },
+  });
+
+  const tagsConfig = createFilterConfig({
+    key: 'tags',
+    outputType: 'string[]' as const,
+    defaultValue: [],
+    label: 'Product Tags',
+    options: {
+      maxTags: 5,
+      suggestions: ['electronics', 'mobile', 'audio', 'wearable', 'work'],
+    },
+  });
+
+  const dateRangeConfig = createFilterConfig({
+    key: 'dateRange',
+    outputType: 'range<date>' as const,
+    defaultValue: [new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), new Date()],
+    label: 'Update Date Range',
+    options: {
+      minDate: new Date(2023, 0, 1),
+      maxDate: new Date(),
+      format: 'yyyy-MM-dd',
+    },
+  });
+
+  const filtersConfig: FilterConfig<CoreOutputValueTypes>[] = [
+    searchConfig,
+    statusConfig,
+    priceRange,
+    ratingConfig,
+    tagsConfig,
+    dateRangeConfig,
   ];
 
   const {
@@ -192,9 +202,6 @@ const AdvancedSearch = () => {
       syncWithUrl: true,
       enableAnalytics: true,
       autoFetch: true,
-      // storage: {
-      //   type: 'local',
-      // },
       retry: {
         attempts: 3,
         delay: 1000,
@@ -250,14 +257,14 @@ const AdvancedSearch = () => {
         {/* Search */}
         <div>
           <label className="block text-sm font-medium mb-1">
-            {filtersConfig[0].label}
+            {searchConfig.label}
           </label>
           <input
             type="text"
             value={filters.search || ''}
             onChange={e => updateFilter('search', e.target.value)}
-            placeholder={filtersConfig[0].options?.placeholder}
-            maxLength={filtersConfig[0].options?.maxLength}
+            placeholder={searchConfig.options?.placeholder}
+            maxLength={searchConfig.options?.maxLength}
             className="w-full p-2 border rounded"
           />
         </div>
@@ -265,7 +272,7 @@ const AdvancedSearch = () => {
         {/* Status */}
         <div>
           <label className="block text-sm font-medium mb-1">
-            {filtersConfig[1].label}
+            {statusConfig.label}
           </label>
           <select
             value={filters.status === undefined ? '' : String(filters.status)}
@@ -286,7 +293,7 @@ const AdvancedSearch = () => {
         {/* Price Range */}
         <div className="col-span-2">
           <label className="block text-sm font-medium mb-1">
-            {filtersConfig[2].label}
+            {priceRange.label}
           </label>
           <div className="flex space-x-4">
             <input
@@ -298,9 +305,9 @@ const AdvancedSearch = () => {
                   filters.priceRange?.[1] || 2000,
                 ])
               }
-              min={filtersConfig[2].options?.min}
-              max={filtersConfig[2].options?.max}
-              step={filtersConfig[2].options?.step}
+              min={priceRange.options?.min}
+              max={priceRange.options?.max}
+              step={priceRange.options?.step}
               className="w-1/2 p-2 border rounded"
             />
             <input
@@ -312,9 +319,9 @@ const AdvancedSearch = () => {
                   Number(e.target.value),
                 ])
               }
-              min={Number(filtersConfig[2].options?.min)}
-              max={Number(filtersConfig[2].options?.max)}
-              step={Number(filtersConfig[2].options?.step)}
+              min={priceRange.options?.min}
+              max={priceRange.options?.max}
+              step={priceRange.options?.step}
               className="w-1/2 p-2 border rounded"
             />
           </div>
@@ -323,7 +330,7 @@ const AdvancedSearch = () => {
         {/* Rating */}
         <div>
           <label className="block text-sm font-medium mb-1">
-            {filtersConfig[3].label}
+            {ratingConfig.label}
           </label>
           <select
             value={filters.rating || '0'}
@@ -340,7 +347,7 @@ const AdvancedSearch = () => {
         {/* Tags */}
         <div>
           <label className="block text-sm font-medium mb-1">
-            {filtersConfig[4].label}
+            {tagsConfig.label}
           </label>
           <select
             multiple
@@ -354,8 +361,8 @@ const AdvancedSearch = () => {
             className="w-full p-2 border rounded"
             size={4}
           >
-            {Array.isArray(filtersConfig[4].options?.suggestions) &&
-              filtersConfig[4].options?.suggestions?.map(tag => (
+            {Array.isArray((tagsConfig.options as any)?.suggestions) &&
+              (tagsConfig.options as any)?.suggestions.map(tag => (
                 <option key={tag} value={tag}>
                   {tag}
                 </option>

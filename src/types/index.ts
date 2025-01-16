@@ -93,6 +93,49 @@ export interface FilterConfig<T extends CoreOutputValueTypes>
   transform?: (value: OutputValueType[T]) => any;
 }
 
+
+// Helper type to infer options based on outputType
+export type InferFilterOptions<T extends CoreOutputValueTypes> = T extends 'string'
+  ? TextOptions | QueryOptions
+  : T extends 'number'
+  ? NumberOptions | SliderOptions
+  : T extends 'boolean'
+  ? undefined
+  : T extends 'date'
+  ? DateRangeOptions
+  : T extends 'string[]'
+  ? SelectOptions<string> | MultiSelectOptions<string> | TagsOptions
+  : T extends 'number[]'
+  ? SelectOptions<number> | MultiSelectOptions<number> | SliderOptions
+  : T extends 'range<number>'
+  ? NumberOptions | SliderOptions
+  : T extends 'range<date>'
+  ? DateRangeOptions
+  : never;
+
+// Type-safe filter config creator
+export type TypedFilterConfig<T extends CoreOutputValueTypes> = {
+  key: string;
+  label?: string;
+  description?: string;
+  required?: boolean;
+  hidden?: boolean;
+  disabled?: boolean;
+  debounce?: number;
+  outputType: T;
+  defaultValue: OutputValueType[T];
+  options?: InferFilterOptions<T>;
+  dependencies?: Record<string, (value: OutputValueType[T]) => any>;
+  validation?: (value: OutputValueType[T]) => boolean | Promise<boolean>;
+  transform?: (value: OutputValueType[T]) => any;
+};
+
+// Helper function to create type-safe filter configs
+export function createFilterConfig<T extends CoreOutputValueTypes>(
+  config: TypedFilterConfig<T>
+): TypedFilterConfig<T> {
+  return config;
+}
 // ==============================================
 // ============== Filter Hooks ==================
 // ==============================================
