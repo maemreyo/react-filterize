@@ -1,38 +1,26 @@
 import { StorageConfig } from '../storage/types';
 
-// ==============================================
-// ============== Basic Value Types =============
-// ==============================================
-
-// Basic primitive types
-export type SingleValue = string | number | boolean;
-export type RangeValue<T> = [T, T];
+// Basic value types
+export type SingleValue = string | number | boolean | Date | File;
 export type ArrayValue<T> = T[];
 
-// ==============================================
-// ============== Output Value Types ============
-// ==============================================
-
-// Instead of mapping filter types to their value types, we now define the core output value types directly.
+// Output value type mapping
 export interface OutputValueType {
   string: string;
   number: number;
   boolean: boolean;
   date: Date;
-  'string[]': ArrayValue<string>;
-  'number[]': ArrayValue<number>;
-  'range<number>': RangeValue<number>;
-  'range<date>': RangeValue<Date>;
-}
-// ==============================================
-// ================= Filter Config ===============
-// ==============================================
-
-export interface BaseFilterOptions extends BaseFilterConfig {
-  options?: unknown;
+  file: File;
+  'string[]': string[];
+  'number[]': number[];
+  'date[]': Date[];
+  'file[]': File[];
 }
 
-// Base filter config interface
+// Core type keys
+export type ValueTypeKey = keyof OutputValueType;
+
+// Base configuration for all filters
 export interface BaseFilterConfig {
   key: string;
   label?: string;
@@ -43,195 +31,27 @@ export interface BaseFilterConfig {
   debounce?: number;
 }
 
-// This type will be used to simplify other type definitions.
-export type CoreOutputValueTypes = keyof OutputValueType;
-
-export type FilterOptionsKeys = keyof FilterOptions;
-
-export type AllowedStringOptions<T extends CoreOutputValueTypes> = Extract<
-  T extends 'range<number>' | 'range<date>'
-    ? T
-    : T extends 'string[]' | 'number[]'
-    ? T
-    : T,
-  FilterOptionsKeys
->;
-
-export type FilterOpts<T extends CoreOutputValueTypes> = AllowedStringOptions<
-  T
-> extends keyof FilterOptions
-  ? FilterOptions[AllowedStringOptions<T>]
-  : never;
-
-export type FilterOptionsType<
-  T extends CoreOutputValueTypes
-> = T extends 'string'
-  ? TextOptions | QueryOptions
-  : T extends 'number'
-  ? NumberOptions | SliderOptions
-  : T extends 'boolean'
-  ? undefined
-  : T extends 'date'
-  ? DateRangeOptions
-  : T extends 'string[]'
-  ? SelectOptions<string> | MultiSelectOptions<string> | TagsOptions
-  : T extends 'number[]'
-  ? SelectOptions<number> | MultiSelectOptions<number> | SliderOptions
-  : T extends 'range<number>'
-  ? NumberOptions | SliderOptions
-  : T extends 'range<date>'
-  ? DateRangeOptions
-  : never;
-
-export interface FilterConfig<T extends CoreOutputValueTypes>
-  extends BaseFilterConfig {
-  outputType: T;
+// Main filter configuration type
+export interface FilterConfig<T extends ValueTypeKey> extends BaseFilterConfig {
+  type: T;
   defaultValue: OutputValueType[T];
-  options?: FilterOptionsType<T>;
   dependencies?: Record<string, (value: OutputValueType[T]) => any>;
-  validation?: (value: OutputValueType[T]) => boolean | Promise<boolean>;
   transform?: (value: OutputValueType[T]) => any;
 }
-
-
-// Helper type to infer options based on outputType
-export type InferFilterOptions<T extends CoreOutputValueTypes> = T extends 'string'
-  ? TextOptions | QueryOptions
-  : T extends 'number'
-  ? NumberOptions | SliderOptions
-  : T extends 'boolean'
-  ? undefined
-  : T extends 'date'
-  ? DateRangeOptions
-  : T extends 'string[]'
-  ? SelectOptions<string> | MultiSelectOptions<string> | TagsOptions
-  : T extends 'number[]'
-  ? SelectOptions<number> | MultiSelectOptions<number> | SliderOptions
-  : T extends 'range<number>'
-  ? NumberOptions | SliderOptions
-  : T extends 'range<date>'
-  ? DateRangeOptions
-  : never;
 
 // Type-safe filter config creator
-export type TypedFilterConfig<T extends CoreOutputValueTypes> = {
-  key: string;
-  label?: string;
-  description?: string;
-  required?: boolean;
-  hidden?: boolean;
-  disabled?: boolean;
-  debounce?: number;
-  outputType: T;
-  defaultValue: OutputValueType[T];
-  options?: InferFilterOptions<T>;
-  dependencies?: Record<string, (value: OutputValueType[T]) => any>;
-  validation?: (value: OutputValueType[T]) => boolean | Promise<boolean>;
-  transform?: (value: OutputValueType[T]) => any;
-};
-
-// Helper function to create type-safe filter configs
-export function createFilterConfig<T extends CoreOutputValueTypes>(
-  config: TypedFilterConfig<T>
-): TypedFilterConfig<T> {
+export function createFilterConfig<T extends ValueTypeKey>(
+  config: FilterConfig<T>
+): FilterConfig<T> {
   return config;
 }
-// ==============================================
-// ============== Filter Hooks ==================
-// ==============================================
 
-// Redefine FilterHook to use OutputValueType
-export type FilterHook<T extends CoreOutputValueTypes> = {
+// Base filter hook type
+export type FilterHook<T extends ValueTypeKey> = {
   value: OutputValueType[T];
-  updateValue: (value: OutputValueType[T]) => Promise<void>;
-  clearValue: () => void;
-  isValid: boolean;
-  options?: FilterOpts<T>;
+  setValue: (value: OutputValueType[T]) => void;
+  clear: () => void;
 };
-
-// ==============================================
-// ============== Filter Options ================
-// ==============================================
-
-// Options interface for each filter type
-export interface TextOptions {
-  maxLength?: number;
-  minLength?: number;
-  pattern?: string;
-  placeholder?: string;
-}
-
-export interface NumberOptions {
-  min?: number;
-  max?: number;
-  step?: number;
-}
-
-export interface SelectOptions<T extends SingleValue = SingleValue> {
-  options: Array<{ value: T; label: string }>;
-  allowEmpty?: boolean;
-}
-
-export interface MultiSelectOptions<T extends SingleValue = SingleValue> {
-  options: Array<{ value: T; label: string }>;
-  maxSelect?: number;
-  minSelect?: number;
-}
-
-export interface DateRangeOptions {
-  minDate?: Date;
-  maxDate?: Date;
-  format?: string;
-}
-
-export interface TimeOptions {
-  format?: '12h' | '24h';
-  step?: number;
-}
-
-export interface SliderOptions {
-  min: number;
-  max: number;
-  step?: number;
-  marks?: Array<{ value: number; label: string }>;
-}
-
-export interface RatingOptions {
-  max?: number;
-  allowHalf?: boolean;
-}
-
-export interface TagsOptions {
-  maxTags?: number;
-  suggestions?: string[];
-}
-
-export interface ColorOptions {
-  format?: 'hex' | 'rgb' | 'hsl';
-  presets?: string[];
-}
-
-export interface QueryOptions {
-  maxLength?: number;
-  placeholder?: string;
-}
-
-// ==============================================
-// ========== Filter Options Mapping =============
-// ==============================================
-export interface FilterOptions {
-  string: TextOptions | QueryOptions;
-  number: NumberOptions | SliderOptions;
-  date: DateRangeOptions;
-  'string[]': SelectOptions | MultiSelectOptions<string> | TagsOptions;
-  'number[]': SelectOptions | MultiSelectOptions<number> | SliderOptions;
-  'range<number>': NumberOptions | SliderOptions;
-  'range<date>': DateRangeOptions;
-}
-
-// ==============================================
-// =============== Filter Group ==================
-// ==============================================
 
 export interface FilterGroup {
   key: string;
@@ -241,11 +61,7 @@ export interface FilterGroup {
   description?: string;
 }
 
-// ==============================================
-// =========== UseFilterize Props ===============
-// ==============================================
-
-export interface UseFilterizeProps<T extends CoreOutputValueTypes> {
+export interface UseFilterizeProps<T extends ValueTypeKey> {
   filtersConfig: FilterConfig<T>[];
   fetchData: (filters: Record<string, any>) => Promise<any>;
   options?: {
@@ -257,37 +73,8 @@ export interface UseFilterizeProps<T extends CoreOutputValueTypes> {
     retry?: RetryConfig;
     transform?: TransformConfig;
   };
-  presets?: FilterPresets;
-  groups?: FilterGroup[];
 }
 
-// ==============================================
-// ================== Presets ===================
-// ==============================================
-
-export interface FilterPresets {
-  dateRanges: {
-    today: () => [Date, Date];
-    lastWeek: () => [Date, Date];
-    lastMonth: () => [Date, Date];
-    custom: (start: Date, end: Date) => [Date, Date];
-  };
-  sorts: {
-    nameAsc: SortConfig;
-    nameDesc: SortConfig;
-    dateAsc: SortConfig;
-    dateDesc: SortConfig;
-  };
-}
-
-export interface SortConfig {
-  key: string;
-  direction: 'asc' | 'desc';
-}
-
-// ==============================================
-// ================== Analytics =================
-// ==============================================
 export interface FilterUsageMetrics {
   count: number;
   lastUsed: Date;
@@ -306,10 +93,6 @@ export interface FilterAnalytics {
   };
 }
 
-// ==============================================
-// ================== Utilities ===================
-// ==============================================
-
 export interface FilterHistory {
   past: FilterHistoryState[];
   present: FilterHistoryState;
@@ -318,7 +101,6 @@ export interface FilterHistory {
 
 export interface FilterHistoryState {
   filters: Record<string, any>;
-  activeGroups: string[];
   timestamp: number;
 }
 

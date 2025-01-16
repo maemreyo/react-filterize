@@ -16,7 +16,5 @@ export interface StorageConfig {
 
 export interface StorageData {
   filters: Record<string, any>;
-  activeGroups: string[];
-  groupStates: Record<string, boolean>;
   timestamp: number;
 }

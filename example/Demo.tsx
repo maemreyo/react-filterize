@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
 import {
-  FilterConfig,
   useFilterize,
-  CoreOutputValueTypes,
-  createFilterConfig,
 } from '@matthew.ngo/react-filterize';
 
 const mockApi = async (filters: Record<string, any>) => {
