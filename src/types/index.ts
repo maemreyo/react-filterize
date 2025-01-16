@@ -20,7 +20,43 @@ export interface OutputValueType {
 // Core type keys
 export type ValueTypeKey = keyof OutputValueType;
 
-// Base configuration for all filters
+type InferValueType<T> = T extends string
+  ? 'string'
+  : T extends number
+  ? 'number'
+  : T extends boolean
+  ? 'boolean'
+  : T extends Date
+  ? 'date'
+  : T extends File
+  ? 'file'
+  : T extends string[]
+  ? 'string[]'
+  : T extends number[]
+  ? 'number[]'
+  : T extends Date[]
+  ? 'date[]'
+  : T extends File[]
+  ? 'file[]'
+  : never;
+
+// Helper type to handle null/undefined
+type Nullable<T> = T | null | undefined;
+
+// Helper type for defaultValue
+type DefaultValue = Nullable<
+  | string
+  | number
+  | boolean
+  | Date
+  | File
+  | string[]
+  | number[]
+  | Date[]
+  | File[]
+>;
+
+// Base configuration without type and defaultValue
 export interface BaseFilterConfig {
   key: string;
   label?: string;
@@ -31,19 +67,68 @@ export interface BaseFilterConfig {
   debounce?: number;
 }
 
-// Main filter configuration type
-export interface FilterConfig<T extends ValueTypeKey> extends BaseFilterConfig {
+// Extended configuration with optional type
+export interface FilterConfigWithType<T extends ValueTypeKey> 
+  extends BaseFilterConfig {
   type: T;
-  defaultValue: OutputValueType[T];
+  defaultValue?: Nullable<OutputValueType[T]>;
   dependencies?: Record<string, (value: OutputValueType[T]) => any>;
   transform?: (value: OutputValueType[T]) => any;
 }
 
+// Configuration with inferred type from defaultValue
+export interface FilterConfigWithoutType<T extends DefaultValue> 
+  extends BaseFilterConfig {
+  defaultValue: T;
+  type?: InferValueType<NonNullable<T>>;
+  dependencies?: Record<
+    string, 
+    (value: T extends null | undefined ? any : T) => any
+  >;
+  transform?: (value: T extends null | undefined ? any : T) => any;
+}
+
+// Union type for all possible configurations
+export type FilterConfig<T = any> = 
+  | FilterConfigWithType<ValueTypeKey>
+  | FilterConfigWithoutType<DefaultValue>;
+
 // Type-safe filter config creator
-export function createFilterConfig<T extends ValueTypeKey>(
-  config: FilterConfig<T>
-): FilterConfig<T> {
-  return config;
+export function createFilterConfig<
+  T extends DefaultValue,
+  Type extends ValueTypeKey = InferValueType<NonNullable<T>>
+>(
+  config: Omit<FilterConfigWithoutType<T>, 'type'> & { type?: Type }
+): FilterConfig {
+  const inferredType = config.type || inferValueTypeFromValue(config.defaultValue);
+  return {
+    ...config,
+    type: inferredType,
+  } as FilterConfig;
+}
+
+// Helper function to infer value type
+function inferValueTypeFromValue(value: DefaultValue): ValueTypeKey {
+  if (value === null || value === undefined) {
+    return 'string'; // Default to string for null/undefined
+  }
+
+  if (Array.isArray(value)) {
+    const firstItem = value[0];
+    if (typeof firstItem === 'string') return 'string[]';
+    if (typeof firstItem === 'number') return 'number[]';
+    if (firstItem instanceof Date) return 'date[]';
+    if (firstItem instanceof File) return 'file[]';
+    return 'string[]'; // Default for empty arrays
+  }
+
+  if (typeof value === 'string') return 'string';
+  if (typeof value === 'number') return 'number';
+  if (typeof value === 'boolean') return 'boolean';
+  if (value instanceof Date) return 'date';
+  if (value instanceof File) return 'file';
+
+  return 'string'; // Default fallback
 }
 
 // Base filter hook type

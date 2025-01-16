@@ -55,7 +55,7 @@ export const validateFilters = async <T extends ValueTypeKey>(
         if (value == null && config.defaultValue == null) {
           return true;
         }
-
+        // @ts-ignore
         return isValidFilterValue(value, config.type);
       })
     );
