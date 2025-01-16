@@ -3,14 +3,19 @@ import { useFilterAnalytics } from './useFilterAnalytics';
 import { serializeFilters, deserializeFilters } from '../utils/serialization';
 import { validateFilters } from '../utils/validation';
 import { getPresetFilters } from '../utils/presets';
-import { FilterTypes, UseFilterizeProps, RetryConfig } from '../types';
+import {
+  UseFilterizeProps,
+  RetryConfig,
+  CoreOutputValueTypes,
+  OutputValueType,
+} from '../types';
 import { StorageManager } from '../storage/adapters/storageManager';
 import useFilterHooks from './useFilterHooks';
 import { DataTransformer } from '../utils/transform';
 import { useFilterHistory } from './useFilterHistory';
 import { withRetry } from '../utils/retry';
 
-export const useFilterize = <T extends FilterTypes>({
+export const useFilterize = <T extends CoreOutputValueTypes>({
   filtersConfig,
   fetchData,
   options = {},
@@ -21,7 +26,7 @@ export const useFilterize = <T extends FilterTypes>({
 
   const {
     syncWithUrl = false,
-    storage = { type: 'session' as const },
+    storage = { type: 'none' as const },
     enableAnalytics = false,
     cacheTimeout = 5 * 60 * 1000, // 5 minutes
     autoFetch = true,
@@ -60,7 +65,9 @@ export const useFilterize = <T extends FilterTypes>({
   }, [storage]);
 
   // State management
-  const [filters, setFilters] = useState<Record<string, any>>(() => {
+  const [filters, setFilters] = useState<
+    Partial<Record<string, OutputValueType[T]>>
+  >(() => {
     if (syncWithUrl) {
       const urlParams = new URLSearchParams(window.location.search);
       return deserializeFilters(urlParams.get('filters') || '');
@@ -306,7 +313,10 @@ export const useFilterize = <T extends FilterTypes>({
 
   // Update synchronization
   const updateFilter = useCallback(
-    (key: string, value: any) => {
+    <K extends string>(
+      key: K,
+      value: Partial<Record<string, OutputValueType[T]>>[K]
+    ) => {
       console.log('[useFilterize] updateFilter for key:', key, 'value:', value);
       setFilters(prev => {
         const newFilters = {
@@ -352,7 +362,10 @@ export const useFilterize = <T extends FilterTypes>({
       }
 
       // Validate filters
-      const isValid = await validateFilters<T>(activeFilters, filtersConfig);
+      const isValid = await validateFilters<T>(
+        activeFilters as any,
+        filtersConfig
+      );
       if (!isValid) {
         throw new Error('Invalid filter configuration');
       }
@@ -374,7 +387,7 @@ export const useFilterize = <T extends FilterTypes>({
             const dependencyResults = await Promise.all(
               Object.entries(config.dependencies).map(
                 async ([depKey, processor]) => {
-                  const processedValue = await processor(value);
+                  const processedValue = await processor(value as any);
                   return [depKey, processedValue];
                 }
               )

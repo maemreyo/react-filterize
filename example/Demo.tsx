@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import {
-  FILTER_TYPES,
   FilterConfig,
-  FilterTypes,
   useFilterize,
+  CoreOutputValueTypes,
+  NumberOptions,
 } from '@matthew.ngo/react-filterize';
 
 // Mock API với random delay và random failure
@@ -11,9 +11,9 @@ const mockApi = async (filters: Record<string, any>) => {
   const delay = Math.random() * 1000 + 500;
   await new Promise(resolve => setTimeout(resolve, delay));
 
-  // if (Math.random() < 0.2) {
-  //   throw new Error('API request failed');
-  // }
+  if (Math.random() < 0.5) {
+    throw new Error('API request failed');
+  }
 
   const items = [
     {
@@ -90,12 +90,11 @@ const mockApi = async (filters: Record<string, any>) => {
 
     return (
       searchMatch &&
-      statusMatch 
-      // &&
-      // priceMatch &&
-      // ratingMatch &&
-      // tagMatch &&
-      // dateMatch
+      statusMatch &&
+      priceMatch &&
+      ratingMatch &&
+      tagMatch &&
+      dateMatch
     );
   });
 };
@@ -103,10 +102,10 @@ const mockApi = async (filters: Record<string, any>) => {
 const AdvancedSearch = () => {
   const [apiCalls, setApiCalls] = useState(0);
 
-  const filtersConfig: FilterConfig<FilterTypes>[] = [
+  const filtersConfig: FilterConfig<CoreOutputValueTypes>[] = [
     {
       key: 'search',
-      type: FILTER_TYPES.QUERY,
+      outputType: 'string',
       defaultValue: '',
       label: 'Search Products',
       description: 'Search by product name',
@@ -119,14 +118,14 @@ const AdvancedSearch = () => {
     },
     {
       key: 'status',
-      type: FILTER_TYPES.BOOLEAN,
-      defaultValue: undefined,
+      outputType: 'boolean',
+      defaultValue: false,
       label: 'Product Status',
       description: 'Filter by product availability',
     },
     {
       key: 'priceRange',
-      type: FILTER_TYPES.RANGE_SLIDER,
+      outputType: 'range<number>',
       defaultValue: [0, 2000],
       label: 'Price Range',
       options: {
@@ -142,17 +141,16 @@ const AdvancedSearch = () => {
     },
     {
       key: 'rating',
-      type: FILTER_TYPES.RATING,
+      outputType: 'number',
       defaultValue: 0,
       label: 'Minimum Rating',
       options: {
         max: 5,
-        allowHalf: true,
       },
     },
     {
       key: 'tags',
-      type: FILTER_TYPES.TAGS,
+      outputType: 'string[]',
       defaultValue: [],
       label: 'Product Tags',
       options: {
@@ -162,7 +160,7 @@ const AdvancedSearch = () => {
     },
     {
       key: 'dateRange',
-      type: FILTER_TYPES.DATE_RANGE,
+      outputType: 'range<date>',
       defaultValue: [
         new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
         new Date(),
@@ -194,9 +192,9 @@ const AdvancedSearch = () => {
       syncWithUrl: true,
       enableAnalytics: true,
       autoFetch: true,
-      storage: {
-        type: 'local',
-      },
+      // storage: {
+      //   type: 'local',
+      // },
       retry: {
         attempts: 3,
         delay: 1000,
@@ -300,9 +298,9 @@ const AdvancedSearch = () => {
                   filters.priceRange?.[1] || 2000,
                 ])
               }
-              min={filtersConfig[2].options?.min}
-              max={filtersConfig[2].options?.max}
-              step={filtersConfig[2].options?.step}
+              min={Number((filtersConfig[2].options as NumberOptions)?.min)}
+              max={Number(filtersConfig[2].options?.max)}
+              step={Number(filtersConfig[2].options?.step)}
               className="w-1/2 p-2 border rounded"
             />
             <input
@@ -314,9 +312,9 @@ const AdvancedSearch = () => {
                   Number(e.target.value),
                 ])
               }
-              min={filtersConfig[2].options?.min}
-              max={filtersConfig[2].options?.max}
-              step={filtersConfig[2].options?.step}
+              min={Number(filtersConfig[2].options?.min)}
+              max={Number(filtersConfig[2].options?.max)}
+              step={Number(filtersConfig[2].options?.step)}
               className="w-1/2 p-2 border rounded"
             />
           </div>
@@ -356,11 +354,12 @@ const AdvancedSearch = () => {
             className="w-full p-2 border rounded"
             size={4}
           >
-            {filtersConfig[4].options?.suggestions?.map(tag => (
-              <option key={tag} value={tag}>
-                {tag}
-              </option>
-            ))}
+            {Array.isArray(filtersConfig[4].options?.suggestions) &&
+              filtersConfig[4].options?.suggestions?.map(tag => (
+                <option key={tag} value={tag}>
+                  {tag}
+                </option>
+              ))}
           </select>
         </div>
       </div>
