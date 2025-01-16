@@ -1,4 +1,7 @@
-export const serializeFilters = (filters: Record<string, any>): string => {
+export const serializeFilters = (
+  filters: Record<string, any>,
+  encodeUrlFilters: boolean = true
+): string => {
   try {
     // Handle special types like Date before serialization
     const processedFilters = Object.entries(filters).reduce(
@@ -15,30 +18,47 @@ export const serializeFilters = (filters: Record<string, any>): string => {
       {} as Record<string, any>
     );
 
-    return btoa(JSON.stringify(processedFilters));
+    // Encode or return filters as query string depending on encodeUrlFilters
+    if (encodeUrlFilters) {
+      return btoa(JSON.stringify(processedFilters));
+    } else {
+      const queryString = new URLSearchParams(
+        processedFilters as Record<string, string>
+      ).toString();
+      return queryString;
+    }
   } catch (error) {
     console.error('Error serializing filters:', error);
     return '';
   }
 };
 
-export const deserializeFilters = (serialized: string): Record<string, any> => {
+export const deserializeFilters = (
+  serialized: string,
+  encodeUrlFilters: boolean = true
+): Record<string, any> => {
   try {
     if (!serialized) return {};
+    let parsed: Record<string, any> = {};
 
-    const parsed = JSON.parse(atob(serialized));
+    // Deserialize filters according to encoding setting
+    if (encodeUrlFilters) {
+      parsed = JSON.parse(atob(serialized));
+    } else {
+      const urlParams = new URLSearchParams(serialized);
+      urlParams.forEach((value, key) => {
+        parsed[key] = value;
+      });
+    }
 
     // Handle special types like Date after deserialization
     return Object.entries(parsed).reduce((acc, [key, value]) => {
-      // Check if value is an ISO date string
       if (
         typeof value === 'string' &&
         /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.*Z$/.test(value)
       ) {
         acc[key] = new Date(value);
-      }
-      // Check if value is an array of ISO date strings
-      else if (
+      } else if (
         Array.isArray(value) &&
         typeof value[0] === 'string' &&
         /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.*Z$/.test(value[0])

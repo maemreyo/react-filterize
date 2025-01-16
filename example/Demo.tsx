@@ -168,12 +168,14 @@ const App: React.FC = () => {
     fetchData: mockApi,
     options: {
       syncWithUrl: true,
+      encodeUrlFilters: true,
+      urlFiltersKey: 'f',
       storage: {
         type: 'local',
         prefix: 'filterize-demo-',
       },
       enableAnalytics: true,
-      autoFetch: false, // Disable auto-fetch to demonstrate manual triggering
+      autoFetch: true, // Disable auto-fetch to demonstrate manual triggering
       retry: {
         attempts: 3,
         delay: 1000,

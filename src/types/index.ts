@@ -66,6 +66,8 @@ export interface UseFilterizeProps<T extends ValueTypeKey> {
   fetchData: (filters: Record<string, any>) => Promise<any>;
   options?: {
     syncWithUrl?: boolean;
+    urlFiltersKey?: string;
+    encodeUrlFilters?: boolean;
     enableAnalytics?: boolean;
     cacheTimeout?: number;
     autoFetch?: boolean;

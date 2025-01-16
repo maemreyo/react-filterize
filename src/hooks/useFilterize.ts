@@ -23,6 +23,8 @@ export const useFilterize = <T extends ValueTypeKey>({
 
   const {
     syncWithUrl = false,
+    urlFiltersKey = 'filters',
+    encodeUrlFilters = true,
     storage = { type: 'none' as const },
     enableAnalytics = false,
     cacheTimeout = 5 * 60 * 1000, // 5 minutes
@@ -58,7 +60,10 @@ export const useFilterize = <T extends ValueTypeKey>({
   >(() => {
     if (syncWithUrl) {
       const urlParams = new URLSearchParams(window.location.search);
-      return deserializeFilters(urlParams.get('filters') || '');
+      const encodedFilters = urlParams.get(urlFiltersKey);
+      return encodedFilters
+        ? deserializeFilters(encodedFilters, encodeUrlFilters)
+        : {};
     }
     return {};
   });
@@ -93,34 +98,30 @@ export const useFilterize = <T extends ValueTypeKey>({
     detectCircularDependencies(filtersConfig);
   }, [filtersConfig]);
 
-  // History management methods
+  // Modify history handling functions
   const undo = useCallback(() => {
     undoHistory();
     const previousState = history.past[history.past.length - 1];
     if (previousState) {
       setFilters(previousState.filters);
-
-      if (syncWithUrl) {
-        const urlParams = new URLSearchParams(window.location.search);
-        urlParams.set('filters', serializeFilters(previousState.filters));
-        window.history.pushState({}, '', `?${urlParams.toString()}`);
-      }
+      updateHistoryForFilters(previousState.filters);
     }
-  }, [history.past, syncWithUrl, undoHistory]);
+  }, [history.past, syncWithUrl, urlFiltersKey, encodeUrlFilters, undoHistory]);
 
   const redo = useCallback(() => {
     redoHistory();
     const nextState = history.future[0];
     if (nextState) {
       setFilters(nextState.filters);
-
-      if (syncWithUrl) {
-        const urlParams = new URLSearchParams(window.location.search);
-        urlParams.set('filters', serializeFilters(nextState.filters));
-        window.history.pushState({}, '', `?${urlParams.toString()}`);
-      }
+      updateHistoryForFilters(nextState.filters);
     }
-  }, [history.future, syncWithUrl, redoHistory]);
+  }, [
+    history.future,
+    syncWithUrl,
+    urlFiltersKey,
+    encodeUrlFilters,
+    redoHistory,
+  ]);
 
   // Load initial state from storage
   useEffect(() => {
@@ -158,13 +159,15 @@ export const useFilterize = <T extends ValueTypeKey>({
   useEffect(() => {
     if (syncWithUrl) {
       const urlParams = new URLSearchParams(window.location.search);
-      const urlFilters = deserializeFilters(urlParams.get('filters') || '');
-
+      const encodedFilters = urlParams.get(urlFiltersKey);
+      const urlFilters = encodedFilters
+        ? deserializeFilters(encodedFilters, encodeUrlFilters)
+        : {};
       setFilters(urlFilters);
     }
-  }, [syncWithUrl]);
+  }, [syncWithUrl, urlFiltersKey, encodeUrlFilters]);
 
-  // Update synchronization
+  // Update filter change handling
   const updateFilter = useCallback(
     <K extends string>(
       key: K,
@@ -176,16 +179,12 @@ export const useFilterize = <T extends ValueTypeKey>({
           [key]: value,
         };
 
-        if (syncWithUrl) {
-          const urlParams = new URLSearchParams(window.location.search);
-          urlParams.set('filters', serializeFilters(newFilters));
-          window.history.pushState({}, '', `?${urlParams.toString()}`);
-        }
+        updateHistoryForFilters(newFilters);
 
         return newFilters;
       });
     },
-    [syncWithUrl]
+    [syncWithUrl, urlFiltersKey, encodeUrlFilters]
   );
 
   // Data fetching with cache
@@ -279,6 +278,25 @@ export const useFilterize = <T extends ValueTypeKey>({
     }
   }, [fetchFilteredData, autoFetch]);
 
+  const updateHistoryForFilters = useCallback(
+    (newFilters: Partial<Record<string, OutputValueType[T]>>) => {
+      if (syncWithUrl) {
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set(
+          urlFiltersKey,
+          serializeFilters(newFilters, encodeUrlFilters)
+        );
+
+        // Construct the new URL with the updated query parameters
+        const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
+
+        // Use pushState to update the URL
+        window.history.pushState({}, '', newUrl);
+      }
+    },
+    [syncWithUrl, urlFiltersKey, encodeUrlFilters]
+  );
+
   // Export filters
   const exportFilters = useCallback(() => {
     return {
@@ -289,10 +307,13 @@ export const useFilterize = <T extends ValueTypeKey>({
   // Import filters
   const importFilters = useCallback(
     (data: { filters: string; groups?: string[] }) => {
-      const importedFilters = deserializeFilters(data.filters);
+      const importedFilters = deserializeFilters(
+        data.filters,
+        encodeUrlFilters
+      );
       setFilters(importedFilters);
     },
-    []
+    [encodeUrlFilters]
   );
 
   const clearStorage = useCallback(async () => {
