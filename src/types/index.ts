@@ -45,6 +45,8 @@ export interface UseFilterizeProps<T extends FilterTypes> {
     cacheTimeout?: number;
     autoFetch?: boolean;
     storage?: StorageConfig;
+    retry?: RetryConfig;
+    transform?: TransformConfig;
   };
   presets?: FilterPresets;
   groups?: FilterGroup[];
@@ -89,4 +91,31 @@ export interface FilterAnalytics {
     cacheHitRate: number;
     totalCacheHits: number;
   };
+}
+
+// ==============================================
+// ================== Utilities ===================
+// ==============================================
+
+export interface FilterHistory {
+  past: FilterHistoryState[];
+  present: FilterHistoryState;
+  future: FilterHistoryState[];
+}
+
+export interface FilterHistoryState {
+  filters: Record<string, any>;
+  activeGroups: string[];
+  timestamp: number;
+}
+
+export interface RetryConfig {
+  attempts: number;
+  delay: number;
+  backoff?: boolean;
+}
+
+export interface TransformConfig {
+  input?: (data: any) => any;
+  output?: (data: any) => any;
 }

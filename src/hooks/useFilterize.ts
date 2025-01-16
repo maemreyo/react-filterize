@@ -3,9 +3,16 @@ import { useFilterAnalytics } from './useFilterAnalytics';
 import { serializeFilters, deserializeFilters } from '../utils/serialization';
 import { validateFilters } from '../utils/validation';
 import { getPresetFilters } from '../utils/presets';
-import { FilterTypes, UseFilterizeProps, FilterTypeToValue } from '../types';
+import {
+  FilterTypes,
+  UseFilterizeProps,
+  RetryConfig,
+} from '../types';
 import { StorageManager } from '../storage/adapters/storageManager';
 import useFilterHooks from './useFilterHooks';
+import { DataTransformer } from '../utils/transform';
+import { useFilterHistory } from './useFilterHistory';
+import { withRetry } from '../utils/retry';
 
 export const useFilterize = <T extends FilterTypes>({
   filtersConfig,
@@ -23,6 +30,24 @@ export const useFilterize = <T extends FilterTypes>({
     cacheTimeout = 5 * 60 * 1000, // 5 minutes
     autoFetch = true,
   } = options;
+
+  const retryConfig = useMemo<RetryConfig>(
+    () => ({
+      attempts: options.retry?.attempts ?? 3,
+      delay: options.retry?.delay ?? 1000,
+      backoff: options.retry?.backoff ?? true,
+    }),
+    [options.retry]
+  );
+
+  const transformer = useMemo(
+    () =>
+      new DataTransformer({
+        input: options.transform?.input,
+        output: options.transform?.output,
+      }),
+    [options.transform]
+  );
 
   console.log('[useFilterize] Options:', {
     syncWithUrl,
@@ -64,6 +89,19 @@ export const useFilterize = <T extends FilterTypes>({
       return initialStates;
     }
   );
+
+  const {
+    history,
+    push: pushHistory,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+  } = useFilterHistory({
+    filters,
+    activeGroups,
+    timestamp: Date.now(),
+  });
 
   // Load initial state from storage
   useEffect(() => {
@@ -256,30 +294,18 @@ export const useFilterize = <T extends FilterTypes>({
       setLoading(true);
       setError(null);
 
-      // Get active filters based on active groups
+      // Get active filters
       const activeFilters = { ...filters };
       console.log('[useFilterize] Active filters:', activeFilters);
-      // if (groups) {
-      //   Object.keys(filters).forEach(key => {
-      //     const isInActiveGroup = activeGroups.some(groupId =>
-      //       groups[groupId as any]?.filters.includes(key)
-      //     );
-      //     if (!isInActiveGroup) {
-      //       delete activeFilters[key];
-      //     }
-      //   });
-      // }
 
-      console.log('[useFilterize] Active filters for fetching:', activeFilters);
-
-      // Generate cache key
+      // Generate cache key từ filters gốc
       const cacheKey = JSON.stringify(activeFilters);
 
       // Check cache
       const cachedResult = cache.current.get(cacheKey);
       if (cachedResult && Date.now() - cachedResult.timestamp < cacheTimeout) {
         console.log('[useFilterize] Using cached data');
-        setData(cachedResult?.data || {});
+        setData(cachedResult.data);
         return;
       }
 
@@ -299,78 +325,41 @@ export const useFilterize = <T extends FilterTypes>({
             value
           );
 
-          // Tìm cấu hình filter tương ứng
           const config = filtersConfig.find(c => c.key === key);
           console.log('[useFilterize] Filter config for', key, ':', config);
 
           if (config?.dependencies) {
-            console.log(
-              '[useFilterize] Filter',
-              key,
-              'has dependencies:',
-              config.dependencies
-            );
-
-            // Xử lý từng dependency
             const dependencyResults = await Promise.all(
               Object.entries(config.dependencies).map(
                 async ([depKey, processor]) => {
-                  console.log(
-                    '[useFilterize] Processing dependency:',
-                    depKey,
-                    'for filter:',
-                    key
-                  );
-
-                  // Gọi processor để xử lý dependency
                   const processedValue = await processor(value);
-                  console.log(
-                    '[useFilterize] Processed dependency:',
-                    depKey,
-                    'with value:',
-                    processedValue
-                  );
-
                   return [depKey, processedValue];
                 }
               )
             );
 
-            console.log(
-              '[useFilterize] Dependency results for filter',
-              key,
-              ':',
-              dependencyResults
-            );
-
-            // Trả về kết quả sau khi xử lý dependencies
-            const result = [key, Object.fromEntries(dependencyResults)];
-            console.log('[useFilterize] Final processed filter:', result);
-            return result;
+            return [key, Object.fromEntries(dependencyResults)];
           }
 
-          // Nếu không có dependencies, trả về filter gốc
-          console.log(
-            '[useFilterize] Filter',
-            key,
-            'has no dependencies. Returning original value.'
-          );
           return [key, value];
         })
       );
 
-      console.log('[useFilterize] All processed filters:', processedFilters);
+      const preparedFilters = Object.fromEntries(processedFilters);
+      console.log('[useFilterize] Processed filters:', preparedFilters);
 
-      console.log('[useFilterize] Processed filters:', processedFilters);
+      // Transform input data nếu có
+      const transformedFilters = transformer.transformInput(preparedFilters);
+      console.log('[useFilterize] Transformed filters:', transformedFilters);
 
-      // Fetch data
-      console.log(
-        '[useFilterize] Fetching data with filters:',
-        processedFilters
-      );
-      const result = await fetchData(Object.fromEntries(processedFilters));
+      // Fetch data với retry
+      const result = await withRetry(async () => {
+        const rawData = await fetchData(transformedFilters);
+        // Transform output data nếu có
+        return transformer.transformOutput(rawData);
+      }, retryConfig);
 
-      // Update cache
+      // Update cache với data đã transform
       cache.current.set(cacheKey, {
         data: result,
         timestamp: Date.now(),
@@ -378,10 +367,11 @@ export const useFilterize = <T extends FilterTypes>({
 
       setData(result);
 
-      // Track analytics if enabled
+      // Track analytics nếu enabled
       if (enableAnalytics && analytics) {
         console.log('[useFilterize] Tracking analytics');
         analytics.trackFilterUsage(activeFilters);
+        // analytics.trackPerformance(Date.now() - startTime, false);
       }
     } catch (err) {
       console.error('[useFilterize] Error fetching data:', err);
@@ -392,13 +382,13 @@ export const useFilterize = <T extends FilterTypes>({
     }
   }, [
     filters,
-    // activeGroups,
-    // groups,
     // filtersConfig,
     // fetchData,
     // cacheTimeout,
     // enableAnalytics,
     // analytics,
+    // transformer,
+    // retryConfig,
   ]);
 
   // Auto-fetch effect
