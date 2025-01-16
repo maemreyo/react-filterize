@@ -1,11 +1,13 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom/client';
+import ProductControl from './ProductControl';
 import Demo from './Demo';
 
 const App = () => {
   return (
     <div>
-      <Demo />
+      <ProductControl />
+      {/* <Demo /> */}
     </div>
   );
 };
