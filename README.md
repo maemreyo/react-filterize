@@ -1,3 +1,8 @@
+[![Version](https://img.shields.io/npm/v/@matthew.ngo/react-filterize.svg)](https://www.npmjs.com/package/@matthew.ngo/react-filterize)
+[![Downloads/week](https://img.shields.io/npm/dw/@matthew.ngo/react-filterize.svg)](https://www.npmjs.com/package/@matthew.ngo/react-filterize)
+[![License](https://img.shields.io/npm/l/@matthew.ngo/react-filterize.svg)](https://github.com/maemreyo/react-filterize/blob/main/LICENSE)
+[![codecov](https://codecov.io/gh/maemreyo/react-filterize/graph/badge.svg?token=YOUR_CODECOV_TOKEN)](https://codecov.io/gh/maemreyo/react-filterize)
+
 # @matthew.ngo/react-filterize Documentation
 
 ## Table of Contents
