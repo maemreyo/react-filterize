@@ -12,6 +12,7 @@ import { StorageManager } from '../storage/adapters/storageManager';
 import { DataTransformer } from '../utils/transform';
 import { useFilterHistory } from './useFilterHistory';
 import { withRetry } from '../utils/retry';
+import { detectCircularDependencies } from '../utils/dependency';
 
 export const useFilterize = <T extends ValueTypeKey>({
   filtersConfig,
@@ -86,6 +87,11 @@ export const useFilterize = <T extends ValueTypeKey>({
       timestamp: Date.now(),
     });
   }, [filters]);
+
+  // Check for circular dependencies on initialization
+  useEffect(() => {
+    detectCircularDependencies(filtersConfig);
+  }, [filtersConfig]);
 
   // History management methods
   const undo = useCallback(() => {
