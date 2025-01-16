@@ -12,7 +12,6 @@ export const ValueTypes = {
   FILE_ARRAY: 'file[]',
 } as const;
 
-
 export interface OutputValueType {
   [ValueTypes.STRING]: string;
   [ValueTypes.NUMBER]: number;
@@ -25,8 +24,8 @@ export interface OutputValueType {
   [ValueTypes.FILE_ARRAY]: File[] | NullableArray<File>;
 }
 
-
 export type ValueTypeKey = typeof ValueTypes[keyof typeof ValueTypes];
+
 type NullableArray<T> = Array<T | null> | null | undefined;
 
 type InferValueType<T> = T extends string
@@ -49,9 +48,7 @@ type InferValueType<T> = T extends string
   ? typeof ValueTypes.FILE_ARRAY
   : never;
 
-
 type Nullable<T> = T | null | undefined;
-
 
 type DefaultValue =
   | string
@@ -66,7 +63,6 @@ type DefaultValue =
   | null
   | undefined;
 
-
 export interface BaseFilterConfig {
   key: string;
   label?: string;
@@ -76,7 +72,6 @@ export interface BaseFilterConfig {
   disabled?: boolean;
   debounce?: number;
 }
-
 
 export interface FilterConfigWithType<T extends ValueTypeKey>
   extends BaseFilterConfig {
@@ -140,7 +135,6 @@ function inferValueTypeFromValue(value: DefaultValue): ValueTypeKey {
   return ValueTypes.STRING;
 }
 
-
 export function createFilterConfig<
   T extends DefaultValue,
   Type extends ValueTypeKey = InferValueType<NonNullable<T>>
@@ -182,8 +176,6 @@ export type FilterValues<T extends FilterConfig[]> = {
   [K in T[number] as K['key']]: FilterOutput<K>;
 };
 
-
-
 export interface UseFilterizeProps<TConfig extends FilterConfig[]> {
   filtersConfig: [...TConfig];
   fetchData: (filters: Partial<FilterValues<TConfig>>) => Promise<any>;
@@ -200,7 +192,6 @@ export interface UseFilterizeProps<TConfig extends FilterConfig[]> {
   };
 }
 
-
 export interface FilterUsageMetrics {
   count: number;
   lastUsed: Date;
@@ -208,13 +199,11 @@ export interface FilterUsageMetrics {
   totalDuration: number;
 }
 
-
 export interface FilterHistory<T> {
   past: FilterHistoryState<T>[];
   present: FilterHistoryState<T>;
   future: FilterHistoryState<T>[];
 }
-
 
 export interface FilterHistoryState<T> {
   filters: T;
@@ -244,21 +233,14 @@ export interface UseFilterAnalyticsReturn<TConfig extends FilterConfig[]> {
 }
 
 export interface UseFilterizeReturn<TConfig extends FilterConfig[]> {
-  
   filters: Partial<FilterValues<TConfig>>;
-  
-  
   updateFilter: <K extends keyof FilterValues<TConfig>>(
     key: K,
     value: FilterValues<TConfig>[K]
   ) => void;
-  
-  
   loading: boolean;
   error: Error | null;
   data: any;
-  
-  
   exportFilters: () => {
     filters: string;
   };
@@ -266,8 +248,6 @@ export interface UseFilterizeReturn<TConfig extends FilterConfig[]> {
     filters: string; 
     groups?: string[];
   }) => void;
-  
-  
   analytics: {
     filterUsage: Record<keyof FilterValues<TConfig>, FilterUsageMetrics>;
     combinations: Record<string, number>;
@@ -278,16 +258,10 @@ export interface UseFilterizeReturn<TConfig extends FilterConfig[]> {
       totalCacheHits: number;
     };
   } | null;
-  
-  
   fetchData: () => Promise<void>;
-  
-  
   storage: {
     clear: () => Promise<void>;
   };
-  
-  
   history: {
     undo: () => void;
     redo: () => void;

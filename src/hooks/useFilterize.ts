@@ -5,8 +5,6 @@ import { validateFilters } from '../utils/validation';
 import {
   UseFilterizeProps,
   RetryConfig,
-  ValueTypeKey,
-  OutputValueType,
   FilterConfig,
   UseFilterizeReturn,
   FilterValues,
