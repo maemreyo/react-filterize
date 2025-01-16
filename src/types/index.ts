@@ -1,9 +1,5 @@
 import { StorageConfig } from '../storage/types';
 
-// Basic value types
-export type SingleValue = string | number | boolean | Date | File;
-export type ArrayValue<T> = T[];
-
 export const ValueTypes = {
   STRING: 'string',
   NUMBER: 'number',
@@ -16,7 +12,7 @@ export const ValueTypes = {
   FILE_ARRAY: 'file[]',
 } as const;
 
-// Output value type mapping
+
 export interface OutputValueType {
   [ValueTypes.STRING]: string;
   [ValueTypes.NUMBER]: number;
@@ -29,7 +25,7 @@ export interface OutputValueType {
   [ValueTypes.FILE_ARRAY]: File[] | NullableArray<File>;
 }
 
-// Core type keys
+
 export type ValueTypeKey = typeof ValueTypes[keyof typeof ValueTypes];
 type NullableArray<T> = Array<T | null> | null | undefined;
 
@@ -53,10 +49,10 @@ type InferValueType<T> = T extends string
   ? typeof ValueTypes.FILE_ARRAY
   : never;
 
-// Helper type to handle null/undefined
+
 type Nullable<T> = T | null | undefined;
 
-// Helper type for defaultValue
+
 type DefaultValue =
   | string
   | number
@@ -70,7 +66,7 @@ type DefaultValue =
   | null
   | undefined;
 
-// Base configuration without type and defaultValue
+
 export interface BaseFilterConfig {
   key: string;
   label?: string;
@@ -81,7 +77,7 @@ export interface BaseFilterConfig {
   debounce?: number;
 }
 
-// Extended configuration with optional type
+
 export interface FilterConfigWithType<T extends ValueTypeKey>
   extends BaseFilterConfig {
   type: T;
@@ -90,7 +86,7 @@ export interface FilterConfigWithType<T extends ValueTypeKey>
   transform?: (value: OutputValueType[T]) => any;
 }
 
-// Configuration with inferred type from defaultValue
+
 export interface FilterConfigWithoutType<T extends DefaultValue>
   extends BaseFilterConfig {
   defaultValue: T;
@@ -102,7 +98,7 @@ export interface FilterConfigWithoutType<T extends DefaultValue>
   transform?: (value: T extends null | undefined ? any : T) => any;
 }
 
-// Union type for all possible configurations
+
 export type FilterConfig<T = any> =
   | FilterConfigWithType<ValueTypeKey>
   | FilterConfigWithoutType<DefaultValue>;
@@ -132,7 +128,7 @@ function inferValueTypeFromValue(value: DefaultValue): ValueTypeKey {
     if (isDateArray(value)) return ValueTypes.DATE_ARRAY;
     if (isNumberArray(value)) return ValueTypes.NUMBER_ARRAY;
     if (isFileArray(value)) return ValueTypes.FILE_ARRAY;
-    return ValueTypes.STRING_ARRAY; // Default for string arrays and empty/all-null arrays
+    return ValueTypes.STRING_ARRAY; 
   }
 
   if (typeof value === 'string') return ValueTypes.STRING;
@@ -144,7 +140,7 @@ function inferValueTypeFromValue(value: DefaultValue): ValueTypeKey {
   return ValueTypes.STRING;
 }
 
-// Type-safe filter config creator
+
 export function createFilterConfig<
   T extends DefaultValue,
   Type extends ValueTypeKey = InferValueType<NonNullable<T>>
@@ -159,7 +155,7 @@ export function createFilterConfig<
   } as FilterConfig;
 }
 
-// Base filter hook type
+
 export type FilterHook<T extends ValueTypeKey> = {
   value: OutputValueType[T];
   setValue: (value: OutputValueType[T]) => void;
@@ -248,21 +244,21 @@ export interface UseFilterAnalyticsReturn<TConfig extends FilterConfig[]> {
 }
 
 export interface UseFilterizeReturn<TConfig extends FilterConfig[]> {
-  // Strongly typed filters object
+  
   filters: Partial<FilterValues<TConfig>>;
   
-  // Typed update function
+  
   updateFilter: <K extends keyof FilterValues<TConfig>>(
     key: K,
     value: FilterValues<TConfig>[K]
   ) => void;
   
-  // Data fetching states
+  
   loading: boolean;
   error: Error | null;
   data: any;
   
-  // Export/Import with typed filters
+  
   exportFilters: () => {
     filters: string;
   };
@@ -271,7 +267,7 @@ export interface UseFilterizeReturn<TConfig extends FilterConfig[]> {
     groups?: string[];
   }) => void;
   
-  // Analytics with proper typing
+  
   analytics: {
     filterUsage: Record<keyof FilterValues<TConfig>, FilterUsageMetrics>;
     combinations: Record<string, number>;
@@ -283,15 +279,15 @@ export interface UseFilterizeReturn<TConfig extends FilterConfig[]> {
     };
   } | null;
   
-  // Fetch function
+  
   fetchData: () => Promise<void>;
   
-  // Storage operations
+  
   storage: {
     clear: () => Promise<void>;
   };
   
-  // History management with typed filters
+  
   history: {
     undo: () => void;
     redo: () => void;
