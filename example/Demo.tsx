@@ -167,8 +167,8 @@
 //     fetch: mockApi,
 //     options: {
 //       syncUrl: true,
-//       encodeUrlFilters: true,
-//       urlFiltersKey: 'f',
+//       encode: true,
+//       urlKey: 'f',
 //       storage: {
 //         type: 'local',
 //         prefix: 'filterize-demo-',

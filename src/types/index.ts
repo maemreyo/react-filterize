@@ -192,8 +192,8 @@ export interface UseFilterizeProps<TConfig extends FilterConfig[]> {
   fetch: (filters: Partial<FilterValues<TConfig>>) => Promise<any>;
   options?: {
     syncUrl?: boolean;
-    urlFiltersKey?: string;
-    encodeUrlFilters?: boolean;
+    urlKey?: string;
+    encode?: boolean;
     cacheTimeout?: number;
     autoFetch?: boolean;
     storage?: StorageConfig;

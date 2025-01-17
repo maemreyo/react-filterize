@@ -99,7 +99,7 @@ const ProductControl: React.FC = () => {
     fetch: fetchFilteredData,
     options: {
       syncUrl: true,
-      urlFiltersKey: 'pf',
+      urlKey: 'pf',
       autoFetch: true,
     },
   });

@@ -143,7 +143,7 @@ const ProductControl: React.FC = () => {
     fetch: fetchFilteredData,
     options: {
       syncUrl: true,
-      urlFiltersKey: 'pf',
+      urlKey: 'pf',
       autoFetch: true,
     },
   });
@@ -248,8 +248,8 @@ export default ProductControl;
 ### 4. URL Synchronization
 
 -   Use the option `syncUrl: true` to synchronize the filter state with the URL. This allows users to share filtered links and return to the previous state using the browser's "back" button.
--   Customize `urlFiltersKey` to change the default query parameter key ('filters').
--   Set `encodeUrlFilters: true` (default) to encode filters in the URL using base64, avoiding special characters. Set it to `false` if you don't want to encode and keep filters as a `URLSearchParams` object.
+-   Customize `urlKey` to change the default query parameter key ('filters').
+-   Set `encode: true` (default) to encode filters in the URL using base64, avoiding special characters. Set it to `false` if you don't want to encode and keep filters as a `URLSearchParams` object.
 
 ### 5. Retry
 
@@ -278,7 +278,7 @@ The main hook for using `@matthew.ngo/react-filterize`.
 | :----------- | :------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------ |
 | `config` | `FilterConfig[]`                                              | An array of filter configurations.                                                                    | `[]`                                                                      |
 | `fetch`    | `(filters: Partial<FilterValues<TConfig>>) => Promise<any>` | A function that fetches data based on the current filters.                                            | `undefined`                                                               |
-| `options`      | `UseFilterizeProps<TConfig>['options']`                    | Additional options.                                                                                  | `{ syncUrl: false, urlFiltersKey: 'filters', encodeUrlFilters: true, autoFetch: true, storage: { type: 'none' }}` |
+| `options`      | `UseFilterizeProps<TConfig>['options']`                    | Additional options.                                                                                  | `{ syncUrl: false, urlKey: 'filters', encode: true, autoFetch: true, storage: { type: 'none' }}` |
 
 **Return Value:**
 
@@ -357,8 +357,8 @@ export const ValueTypes = {
 **Solution:**
 
 -   Make sure the `syncUrl` option is enabled.
--   Check if `urlFiltersKey` is configured correctly.
--   In case of `encodeUrlFilters: false`, filters are stored as a `URLSearchParams` object, the `key` corresponds to `FilterConfig.key`, `value` will be the serialized value of the corresponding filter.
+-   Check if `urlKey` is configured correctly.
+-   In case of `encode: false`, filters are stored as a `URLSearchParams` object, the `key` corresponds to `FilterConfig.key`, `value` will be the serialized value of the corresponding filter.
 
 **Issue:** Filter value is incorrect
 

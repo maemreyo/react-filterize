@@ -54,7 +54,7 @@ export const convertInputValue = (value: any, type?: string) => {
 
 export const serializeFilters = (
   filters: Record<string, any>,
-  encodeUrlFilters: boolean = true
+  encode: boolean = true
 ): string => {
   try {
     // Handle special types like Date before serialization
@@ -72,7 +72,7 @@ export const serializeFilters = (
       {} as Record<string, any>
     );
 
-    if (encodeUrlFilters) {
+    if (encode) {
       return btoa(JSON.stringify(processedFilters));
     } else {
       const queryString = new URLSearchParams();
@@ -91,7 +91,7 @@ export const serializeFilters = (
 
 export const deserializeFilters = (
   serialized: string,
-  encodeUrlFilters: boolean = true,
+  encode: boolean = true,
   fConfig?: FilterConfig[]
 ): Record<string, any> => {
   try {
@@ -100,7 +100,7 @@ export const deserializeFilters = (
     let parsed: Record<string, any> = {};
 
     // Deserialize filters according to encoding setting
-    if (encodeUrlFilters) {
+    if (encode) {
       parsed = JSON.parse(atob(serialized));
     } else {
       const urlParams = new URLSearchParams(serialized);
