@@ -371,9 +371,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     } finally {
       setLoading(false);
     }
-  }, [
-    filters,
-  ]);
+  }, [filters]);
 
   const debouncedFetch = useMemo(
     () => debounce(fetchFilteredData, fetchOptions.debounceTime),
@@ -416,18 +414,32 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
   }, [storageManager, syncUrl]);
 
   const reset = useCallback(() => {
-    setFilters((fetchOptions.defaultValues as any) || ({} as any));
+    const defaultValues = (fetchOptions.defaultValues as any) || ({} as any);
+    setFilters(defaultValues);
     setFilterSource('default');
 
     if (syncUrl) {
       const urlParams = new URLSearchParams(window.location.search);
-      urlParams.delete(urlKey);
+      if (Object.keys(defaultValues).length > 0) {
+        // Sync defaultValues to URL if they exist
+        urlParams.set(urlKey, serializeFilters(defaultValues, encode));
+      } else {
+        urlParams.delete(urlKey);
+      }
       const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
       window.history.pushState({}, '', newUrl);
     }
 
-    clearStorage();
-  }, [fetchOptions, clearStorage, syncUrl, urlKey]);
+    // Sync with storage
+    if (Object.keys(defaultValues).length > 0) {
+      storageManager.save({
+        filters: defaultValues,
+        timestamp: Date.now(),
+      });
+    } else {
+      clearStorage();
+    }
+  }, [fetchOptions, clearStorage, syncUrl, urlKey, encode, storageManager]);
 
   return {
     filters,

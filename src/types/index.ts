@@ -70,7 +70,6 @@ export interface BaseFilterConfig {
   required?: boolean;
   hidden?: boolean;
   disabled?: boolean;
-  debounce?: number;
 }
 
 export interface FilterConfigWithType<T extends ValueTypeKey>
