@@ -20,13 +20,13 @@ import { withRetry } from '../utils/retry';
 import { detectCircularDependencies } from '../utils/dependency';
 
 export const useFilterize = <TConfig extends FilterConfig[]>({
-  filtersConfig,
+  config: fConfig,
   options = {},
-  fetchData,
+  fetch,
 }: UseFilterizeProps<TConfig>): UseFilterizeReturn<TConfig> => {
   console.log('[useFilterize] Initializing useFilterize hook');
 
-  const memoizedFiltersConfig = useMemo(() => filtersConfig, []);
+  const memoizedFiltersConfig = useMemo(() => fConfig, []);
   const memoizedOptions = useMemo(
     () => ({
       syncWithUrl: false,
@@ -157,7 +157,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
 
   // Check for circular dependencies on mount only
   useEffect(() => {
-    detectCircularDependencies(filtersConfig);
+    detectCircularDependencies(fConfig);
   }, []); // Empty dependency array as this should only run once
 
   // Memoize undo/redo functions
@@ -319,7 +319,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       }
 
       // Validate filters
-      const isValid = await validateFilters(activeFilters, filtersConfig);
+      const isValid = await validateFilters(activeFilters, fConfig);
       if (!isValid) {
         throw new Error('Invalid filter configuration');
       }
@@ -327,7 +327,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       // Process dependencies
       const processedFilters = await Promise.all(
         Object.entries(activeFilters).map(async ([key, value]) => {
-          const config = filtersConfig.find(c => c.key === key);
+          const config = fConfig.find(c => c.key === key);
 
           if (config?.dependencies) {
             const dependencyResults = await Promise.all(
@@ -351,7 +351,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
 
       // Fetch data with retry
       const result = await withRetry(async () => {
-        const rawData = await fetchData(transformedFilters);
+        const rawData = await fetch(transformedFilters);
         return transformer.transformOutput(rawData);
       }, retryConfig);
 
@@ -405,7 +405,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     }
   }, [storageManager, syncWithUrl]);
 
-  const resetToDefaults = useCallback(() => {
+  const reset = useCallback(() => {
     setFilters({});
     setFilterSource('default');
 
@@ -428,11 +428,11 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     filterSource,
     exportFilters,
     importFilters,
-    fetchData: fetchFilteredData,
+    fetch: fetchFilteredData,
     storage: {
       clear: clearStorage,
     },
-    resetToDefaults,
+    reset,
     history: {
       undo,
       redo,

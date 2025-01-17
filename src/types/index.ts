@@ -136,7 +136,7 @@ function inferValueTypeFromValue(value: DefaultValue): ValueTypeKey {
   return ValueTypes.STRING;
 }
 
-export function createFilterConfig<
+export function addFilter<
   T extends DefaultValue,
   Type extends ValueTypeKey = InferValueType<NonNullable<T>>
 >(
@@ -188,8 +188,8 @@ export type FilterValues<T extends FilterConfig[]> = {
 };
 
 export interface UseFilterizeProps<TConfig extends FilterConfig[]> {
-  filtersConfig: TConfig;
-  fetchData: (filters: Partial<FilterValues<TConfig>>) => Promise<any>;
+  config: TConfig;
+  fetch: (filters: Partial<FilterValues<TConfig>>) => Promise<any>;
   options?: {
     syncWithUrl?: boolean;
     urlFiltersKey?: string;
@@ -235,11 +235,11 @@ export interface UseFilterizeReturn<TConfig extends FilterConfig[]> {
     filters: string;
   };
   importFilters: (data: { filters: string; groups?: string[] }) => void;
-  fetchData: () => Promise<void>;
+  fetch: () => Promise<void>;
   storage: {
     clear: () => Promise<void>;
   };
-  resetToDefaults: () => void;
+  reset: () => void;
   history: {
     undo: () => void;
     redo: () => void;

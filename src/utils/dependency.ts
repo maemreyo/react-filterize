@@ -1,10 +1,10 @@
 import { FilterConfig, ValueTypeKey } from '../types';
 
 export const detectCircularDependencies = <T extends ValueTypeKey>(
-  filtersConfig: FilterConfig<T>[]
+  f: FilterConfig<T>[]
 ): void => {
   const graph: Record<string, string[]> = {};
-  filtersConfig.forEach(config => {
+  f.forEach(config => {
     graph[config.key] = Object.keys(config.dependencies || {});
   });
 

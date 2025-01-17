@@ -50,7 +50,7 @@ import ProductsGrid from './ProductGrid';
 import { dummyData } from './data';
 import {
   useFilterize,
-  createFilterConfig,
+  addFilter,
   ValueTypes,
 } from '@matthew.ngo/react-filterize';
 
@@ -80,31 +80,31 @@ const Loading = styled.div`
 
 const ProductControl: React.FC = () => {
   // Define filter configuration
-  const filtersConfig = [
-    createFilterConfig({
+  const config = [
+    addFilter({
       key: 'search',
       label: 'Search',
       defaultValue: '',
       transform: (value: string) => value.toLowerCase(),
     }),
-    createFilterConfig({
+    addFilter({
       key: 'status',
       label: 'Status',
       defaultValue: '',
       transform: (value: string) => value === 'true',
     }),
-    createFilterConfig({
+    addFilter({
       key: 'minPrice',
       label: 'Min Price',
       defaultValue: 0,
       type: ValueTypes.NUMBER
     }),
-    createFilterConfig({
+    addFilter({
       key: 'maxPrice',
       label: 'Max Price',
       defaultValue: 0,
     }),
-    createFilterConfig({
+    addFilter({
       key: 'rating',
       label: 'Min Rating',
       defaultValue: 0,
@@ -139,8 +139,8 @@ const ProductControl: React.FC = () => {
     data: products,
     filterSource,
   } = useFilterize({
-    filtersConfig,
-    fetchData: fetchFilteredData,
+    config,
+    fetch: fetchFilteredData,
     options: {
       syncWithUrl: true,
       urlFiltersKey: 'pf',
@@ -176,11 +176,11 @@ export default ProductControl;
 
 ### 1. Filter Configuration
 
--   Use `createFilterConfig` to create configurations for each filter. This helps you easily manage the data type and other attributes of the filter.
+-   Use `addFilter` to create configurations for each filter. This helps you easily manage the data type and other attributes of the filter.
 -   Use the `transform` property to normalize the filter input data. For example, convert the search string to lowercase.
 
     ```javascript
-    createFilterConfig({
+    addFilter({
       key: 'search',
       label: 'Search',
       defaultValue: '',
@@ -191,28 +191,28 @@ export default ProductControl;
 -   Set `defaultValue` according to the data type of the filter.
 -   For array `defaultValue` (empty or not), you can omit `type` key or explicitly set `type` to corresponding value:
     ```javascript
-    createFilterConfig({
+    addFilter({
         key: 'stringArr',
         defaultValue: [] // or ['a', 'b']
         // inferred type: string[]
         // type: ValueTypes.STRING_ARRAY // optional
       })
 
-      createFilterConfig({
+      addFilter({
         key: 'numberArr',
         defaultValue: [] // or [1, 2]
         // inferred type: number[]
         // type: ValueTypes.NUMBER_ARRAY // optional
       })
 
-      createFilterConfig({
+      addFilter({
         key: 'dateArr',
         defaultValue: [] // or [new Date()]
         // inferred type: date[]
         // type: ValueTypes.DATE_ARRAY // optional
       })
 
-      createFilterConfig({
+      addFilter({
         key: 'fileArr',
         defaultValue: []
         // inferred type: file[]
@@ -224,7 +224,7 @@ export default ProductControl;
 -   Use `debounce` in `FilterConfig` to delay updating the filter until the user has stopped typing for a certain period. This helps reduce the number of unnecessary API calls.
 
     ```javascript
-      createFilterConfig({
+      addFilter({
         key: 'search',
         label: 'Search',
         defaultValue: '',
@@ -259,8 +259,8 @@ export default ProductControl;
 ### 6. Transformations
 
 -   Configure the `input` and `output` functions in the `transform` option to transform data before and after fetching.
--   The `input` function is used to change `filters` before passing them to the `fetchData` function.
--   The `output` function is used to change `data` returned from `fetchData` before saving it to the state.
+-   The `input` function is used to change `filters` before passing them to the `fetch` function.
+-   The `output` function is used to change `data` returned from `fetch` before saving it to the state.
 
 ## Examples
 
@@ -276,8 +276,8 @@ The main hook for using `@matthew.ngo/react-filterize`.
 
 | Prop         | Type                                                           | Description                                                                                           | Default                                                                   |
 | :----------- | :------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------ |
-| `filtersConfig` | `FilterConfig[]`                                              | An array of filter configurations.                                                                    | `[]`                                                                      |
-| `fetchData`    | `(filters: Partial<FilterValues<TConfig>>) => Promise<any>` | A function that fetches data based on the current filters.                                            | `undefined`                                                               |
+| `config` | `FilterConfig[]`                                              | An array of filter configurations.                                                                    | `[]`                                                                      |
+| `fetch`    | `(filters: Partial<FilterValues<TConfig>>) => Promise<any>` | A function that fetches data based on the current filters.                                            | `undefined`                                                               |
 | `options`      | `UseFilterizeProps<TConfig>['options']`                    | Additional options.                                                                                  | `{ syncWithUrl: false, urlFiltersKey: 'filters', encodeUrlFilters: true, autoFetch: true, storage: { type: 'none' }}` |
 
 **Return Value:**
@@ -292,12 +292,12 @@ The main hook for using `@matthew.ngo/react-filterize`.
 | `filterSource`  | `FilterSource`                                                                               | The source of current filter values: 'url', 'storage' or 'default'.               |
 | `exportFilters` | `() => { filters: string }`                                                                       | Function to export filters as a serialized string.                                    |
 | `importFilters` | `(data: { filters: string, groups?: string[] }) => void`                                      | Function to import filters from a serialized string.                                  |
-| `fetchData`     | `() => Promise<void>`                                                                          | Function to re-fetch data from API with current filters                               |
+| `fetch`     | `() => Promise<void>`                                                                          | Function to re-fetch data from API with current filters                               |
 | `storage`       | `{ clear: () => Promise<void> }`                                                                | Function to clear storage                                                              |
-| `resetToDefaults` | `() => void` | Function to reset filters to `defaultValue` |
+| `reset` | `() => void` | Function to reset filters to `defaultValue` |
 | `history` | `{ undo: () => void; redo: () => void; canUndo: boolean; canRedo: boolean; current: FilterHistoryState<Partial<FilterValues<TConfig>>>; past: FilterHistoryState<Partial<FilterValues<TConfig>>>[]; future: FilterHistoryState<Partial<FilterValues<TConfig>>>[] }` | Functions and states to manage filters change history (undo, redo, etc.) |
 
-### `createFilterConfig`
+### `addFilter`
 
 A utility function to create a configuration for a filter.
 
@@ -347,10 +347,10 @@ export const ValueTypes = {
 
 **Solution:**
 
--   Check the `fetchData` function and make sure it returns the correct data.
+-   Check the `fetch` function and make sure it returns the correct data.
 -   Check for network errors.
 -   Use `console.log` to debug the values of filters and data.
--   Make sure the `autoFetch` option is set to `true` (default) or call `fetchData` function from `useFilterize` return value manually.
+-   Make sure the `autoFetch` option is set to `true` (default) or call `fetch` function from `useFilterize` return value manually.
 
 **Issue:** Filters are not in sync with the URL
 
@@ -407,7 +407,7 @@ Copyright (c) 2023 Matthew Ngo
 
 ```typescript
 // FilterConfig for the 'category' filter
-createFilterConfig({
+addFilter({
   key: 'category',
   label: 'Category',
   defaultValue: '',
@@ -415,7 +415,7 @@ createFilterConfig({
 });
 
 // FilterConfig for the 'subCategory' filter that depends on 'category'
-createFilterConfig({
+addFilter({
   key: 'subCategory',
   label: 'Sub-Category',
   defaultValue: '',

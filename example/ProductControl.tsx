@@ -5,7 +5,7 @@ import ProductsGrid from './ProductGrid';
 import { dummyData } from './data';
 import {
   useFilterize,
-  createFilterConfig,
+  addFilter,
   ValueTypes,
 } from '@matthew.ngo/react-filterize';
 
@@ -35,37 +35,37 @@ const Loading = styled.div`
 
 const ProductControl: React.FC = () => {
   // Define filter configurations
-  const filtersConfig = [
-    createFilterConfig({
+  const config = [
+    addFilter({
       key: 'search',
       label: 'Search',
       defaultValue: '',
       transform: (value: string) => value.toLowerCase(),
     }),
-    createFilterConfig({
+    addFilter({
       key: 'status',
       label: 'Status',
       defaultValue: '',
       transform: (value: string) => value === 'true',
     }),
-    createFilterConfig({
+    addFilter({
       key: 'minPrice',
       label: 'Min Price',
       defaultValue: 0,
     }),
-    createFilterConfig({
+    addFilter({
       key: 'maxPrice',
       label: 'Max Price',
       defaultValue: 0,
     }),
-    createFilterConfig({
+    addFilter({
       key: 'rating',
       label: 'Min Rating',
       defaultValue: 0,
     }),
   ];
 
-  console.log('filtersConfig', filtersConfig);
+  console.log('config', config);
 
   // Mock API function
   const fetchFilteredData = async (filters: any) => {
@@ -95,8 +95,8 @@ const ProductControl: React.FC = () => {
     data: products,
     filterSource,
   } = useFilterize({
-    filtersConfig,
-    fetchData: fetchFilteredData,
+    config,
+    fetch: fetchFilteredData,
     options: {
       syncWithUrl: true,
       urlFiltersKey: 'pf',

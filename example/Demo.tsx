@@ -1,7 +1,7 @@
 // import React, { useState, useEffect, useCallback } from 'react';
 // import {
 //   useFilterize,
-//   createFilterConfig,
+//   addFilter,
 //   FilterConfig,
 //   ValueTypeKey,
 // } from '@matthew.ngo/react-filterize';
@@ -104,44 +104,44 @@
 // };
 
 // // Define filter configurations
-// const filtersConfig: FilterConfig<ValueTypeKey>[] = [
-//   createFilterConfig({
+// const config: FilterConfig<ValueTypeKey>[] = [
+//   addFilter({
 //     key: 'search',
 //     type: 'string',
 //     defaultValue: '',
 //     label: 'Search by Name',
 //   }),
-//   createFilterConfig({
+//   addFilter({
 //     key: 'status',
 //     type: 'boolean',
 //     defaultValue: undefined,
 //     label: 'Status',
 //   }),
-//   createFilterConfig({
+//   addFilter({
 //     key: 'priceRange',
 //     type: 'number[]',
 //     defaultValue: [0, 0] as [number, number],
 //     label: 'Price Range',
 //   }),
-//   createFilterConfig({
+//   addFilter({
 //     key: 'rating',
 //     type: 'number',
 //     defaultValue: 0,
 //     label: 'Minimum Rating',
 //   }),
-//   createFilterConfig({
+//   addFilter({
 //     key: 'tags',
 //     type: 'string[]',
 //     defaultValue: [] as string[],
 //     label: 'Tags',
 //   }),
-//   createFilterConfig({
+//   addFilter({
 //     key: 'dateRange',
 //     type: 'date[]',
 //     defaultValue: [null, null] as [Date | null, Date | null],
 //     label: 'Date Range',
 //   }),
-//   createFilterConfig({
+//   addFilter({
 //     key: 'simulateFailure',
 //     type: 'boolean',
 //     defaultValue: false,
@@ -157,14 +157,14 @@
 //     error,
 //     data,
 //     analytics,
-//     fetchData,
+//     fetch,
 //     exportFilters,
 //     importFilters,
 //     storage,
 //     history,
 //   } = useFilterize({
-//     filtersConfig,
-//     fetchData: mockApi,
+//     config,
+//     fetch: mockApi,
 //     options: {
 //       syncWithUrl: true,
 //       encodeUrlFilters: true,
@@ -230,8 +230,8 @@
 //   );
 
 //   const handleFetch = useCallback(() => {
-//     fetchData();
-//   }, [fetchData]);
+//     fetch();
+//   }, [fetch]);
 
 //   const handleExport = useCallback(() => {
 //     const exportedData = exportFilters();
@@ -252,7 +252,7 @@
 //   }, [storage]);
 
 //   const handleResetFilters = useCallback(() => {
-//     const resetValues = filtersConfig.reduce(
+//     const resetValues = config.reduce(
 //       (acc, config) => ({
 //         ...acc,
 //         [config.key]: config.defaultValue,
@@ -261,7 +261,7 @@
 //     );
 //     updateFilter('all', resetValues);
 //     console.log('[Reset Filters] Filters reset to default.');
-//   }, [updateFilter, filtersConfig]);
+//   }, [updateFilter, config]);
 
 //   const handleUndo = useCallback(() => {
 //     history.undo();
@@ -284,7 +284,7 @@
 //       <h1>Filter Demo</h1>
 //       <div>
 //         <h2>Filters</h2>
-//         {filtersConfig.map(config => (
+//         {config.map(config => (
 //           <div key={config.key} style={{ marginBottom: '10px' }}>
 //             {config.type === 'boolean' && (
 //               <>

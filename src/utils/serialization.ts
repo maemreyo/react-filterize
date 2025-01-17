@@ -92,7 +92,7 @@ export const serializeFilters = (
 export const deserializeFilters = (
   serialized: string,
   encodeUrlFilters: boolean = true,
-  filtersConfig?: FilterConfig[]
+  fConfig?: FilterConfig[]
 ): Record<string, any> => {
   try {
     if (!serialized) return {};
@@ -110,9 +110,9 @@ export const deserializeFilters = (
     }
 
     // Convert values based on filter config types
-    if (filtersConfig) {
+    if (fConfig) {
       return Object.entries(parsed).reduce((acc, [key, value]) => {
-        const config = filtersConfig.find(c => c.key === key);
+        const config = fConfig.find(c => c.key === key);
         if (config) {
           acc[key] = convertValueByType(value, config.type);
         } else {
