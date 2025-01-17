@@ -1,10 +1,15 @@
-import { StorageAdapter, StorageConfig, StorageData } from '../types';
+import {
+  StorageAdapter,
+  SyncStorageAdapter,
+  StorageConfig,
+  StorageData,
+} from '../types';
 import { LocalStorageAdapter } from './localStorageAdapter';
 import { MemoryStorageAdapter } from './memoryStorageAdapter';
 import { SessionStorageAdapter } from './sessionStorageAdapter';
 
 export class StorageManager {
-  private adapter: StorageAdapter;
+  private adapter: StorageAdapter | SyncStorageAdapter;
   private serializer: StorageConfig['serializer'];
 
   constructor(config: StorageConfig) {
@@ -49,6 +54,26 @@ export class StorageManager {
       return data;
     } catch (error) {
       console.error('Failed to load filter data:', error);
+      return null;
+    }
+  }
+
+  loadSync(): StorageData | null {
+    try {
+      // Check if the adapter supports synchronous operations
+      if ('getItemSync' in this.adapter) {
+        const serialized = this.adapter.getItemSync('filterData');
+        if (!serialized) return null;
+
+        const data = this.serializer?.deserialize(serialized);
+        return data;
+      }
+      console.warn(
+        'Synchronous loading is not supported by the current adapter'
+      );
+      return null;
+    } catch (error) {
+      console.error('Failed to load filter data synchronously:', error);
       return null;
     }
   }

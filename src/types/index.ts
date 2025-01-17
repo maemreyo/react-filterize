@@ -155,7 +155,6 @@ export type FilterHook<T extends ValueTypeKey> = {
   setValue: (value: OutputValueType[T]) => void;
   clear: () => void;
 };
-
 export interface FilterGroup {
   key: string;
   label: string;
@@ -203,6 +202,8 @@ export interface UseFilterizeProps<TConfig extends FilterConfig[]> {
   };
 }
 
+export type FilterSource = 'url' | 'storage' | 'default' | 'none';
+
 export interface FilterUsageMetrics {
   count: number;
   lastUsed: Date;
@@ -220,8 +221,6 @@ export interface FilterHistoryState<T> {
   filters: T;
   timestamp: number;
 }
-
-
 export interface UseFilterizeReturn<TConfig extends FilterConfig[]> {
   filters: Partial<FilterValues<TConfig>>;
   updateFilter: <K extends keyof FilterValues<TConfig>>(
@@ -231,6 +230,7 @@ export interface UseFilterizeReturn<TConfig extends FilterConfig[]> {
   loading: boolean;
   error: Error | null;
   data: any;
+  filterSource: FilterSource;
   exportFilters: () => {
     filters: string;
   };
@@ -239,6 +239,7 @@ export interface UseFilterizeReturn<TConfig extends FilterConfig[]> {
   storage: {
     clear: () => Promise<void>;
   };
+  resetToDefaults: () => void;
   history: {
     undo: () => void;
     redo: () => void;

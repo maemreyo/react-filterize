@@ -93,21 +93,19 @@ const ProductControl: React.FC = () => {
     loading,
     error,
     data: products,
+    filterSource,
   } = useFilterize({
     filtersConfig,
     fetchData: fetchFilteredData,
     options: {
       syncWithUrl: true,
       urlFiltersKey: 'pf',
-      // storage: {
-      //   type: 'local',
-      //   prefix: 'products-',
-      // },
       autoFetch: true,
     },
   });
 
   console.log('filtesrs', filters);
+  console.log('filterSource', filterSource);
 
   // Handler for filter changes
   const handleFilterChange = (

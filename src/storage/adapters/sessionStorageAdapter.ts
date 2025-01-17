@@ -1,6 +1,7 @@
-import { StorageAdapter } from '../types';
+// adapters/sessionStorageAdapter.ts
+import { StorageAdapter, SyncStorageAdapter } from '../types';
 
-export class SessionStorageAdapter implements StorageAdapter {
+export class SessionStorageAdapter implements SyncStorageAdapter {
   private prefix: string;
 
   constructor(prefix: string = '') {
@@ -12,18 +13,34 @@ export class SessionStorageAdapter implements StorageAdapter {
   }
 
   async getItem(key: string): Promise<string | null> {
-    return sessionStorage.getItem(this.getKey(key));
+    return this.getItemSync(key);
   }
 
   async setItem(key: string, value: string): Promise<void> {
-    sessionStorage.setItem(this.getKey(key), value);
+    this.setItemSync(key, value);
   }
 
   async removeItem(key: string): Promise<void> {
-    sessionStorage.removeItem(this.getKey(key));
+    this.removeItemSync(key);
   }
 
   async clear(): Promise<void> {
+    this.clearSync();
+  }
+
+  getItemSync(key: string): string | null {
+    return sessionStorage.getItem(this.getKey(key));
+  }
+
+  setItemSync(key: string, value: string): void {
+    sessionStorage.setItem(this.getKey(key), value);
+  }
+
+  removeItemSync(key: string): void {
+    sessionStorage.removeItem(this.getKey(key));
+  }
+
+  clearSync(): void {
     Object.keys(sessionStorage)
       .filter(key => key.startsWith(this.prefix))
       .forEach(key => sessionStorage.removeItem(key));

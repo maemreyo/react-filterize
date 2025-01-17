@@ -11,6 +11,7 @@ import {
   FilterConfig,
   UseFilterizeReturn,
   FilterValues,
+  FilterSource,
 } from '../types';
 import { StorageManager } from '../storage/adapters/storageManager';
 import { DataTransformer } from '../utils/transform';
@@ -26,7 +27,6 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
   console.log('[useFilterize] Initializing useFilterize hook');
 
   const memoizedFiltersConfig = useMemo(() => filtersConfig, []);
-
   const memoizedOptions = useMemo(
     () => ({
       syncWithUrl: false,
@@ -68,7 +68,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       }),
     [options.transform]
   );
-
+  const [filterSource, setFilterSource] = useState<FilterSource>('none');
   const storageManager = useMemo(() => new StorageManager(storage), [storage]);
 
   // Helper function to deserialize URL filters
@@ -86,11 +86,26 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
 
   // State management
   const [filters, setFilters] = useState<Partial<FilterValues<TConfig>>>(() => {
+    // Priority order: URL > Storage > Default
     if (syncWithUrl) {
       const urlParams = new URLSearchParams(window.location.search);
       const encodedFilters = urlParams.get(urlFiltersKey);
-      return deserializeUrlFilters(encodedFilters);
+      if (encodedFilters) {
+        setFilterSource('url');
+        return deserializeUrlFilters(encodedFilters) as Partial<
+          FilterValues<TConfig>
+        >;
+      }
     }
+
+    // Try loading from storage if no URL parameters
+    const storedData = storageManager.loadSync();
+    if (storedData?.filters) {
+      setFilterSource('storage');
+      return storedData.filters as Partial<FilterValues<TConfig>>;
+    }
+
+    setFilterSource('default');
     return {};
   });
 
@@ -176,17 +191,17 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     loadStoredData();
   }, []);
 
-  // Save state to storage when filters change
-  useEffect(() => {
-    const saveData = async () => {
-      await storageManager.save({
-        filters,
-        timestamp: Date.now(),
-      });
-    };
+  // // Save state to storage when filters change
+  // useEffect(() => {
+  //   const saveData = async () => {
+  //     await storageManager.save({
+  //       filters,
+  //       timestamp: Date.now(),
+  //     });
+  //   };
 
-    saveData();
-  }, [filters, storageManager]);
+  //   saveData();
+  // }, [filters, storageManager]);
 
   // Cache management with useRef
   const cache = useRef<
@@ -195,6 +210,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       {
         data: any;
         timestamp: number;
+        source: FilterSource;
       }
     >
   >(new Map());
@@ -205,21 +221,49 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       const handleUrlChange = () => {
         const urlParams = new URLSearchParams(window.location.search);
         const encodedFilters = urlParams.get(urlFiltersKey);
-        const urlFilters = deserializeUrlFilters(encodedFilters);
-        setFilters(urlFilters);
+
+        if (encodedFilters) {
+          const urlFilters = deserializeFilters(
+            encodedFilters,
+            encodeUrlFilters,
+            memoizedFiltersConfig
+          );
+          setFilters(urlFilters as Partial<FilterValues<TConfig>>);
+          setFilterSource('url');
+        } else if (storage.type !== 'none') {
+          // Fallback to storage if URL is empty
+          const storedData = storageManager.loadSync();
+          if (storedData?.filters) {
+            setFilters(storedData.filters as Partial<FilterValues<TConfig>>);
+            setFilterSource('storage');
+          }
+        }
       };
 
-      // Handle initial URL state
-      handleUrlChange();
-
-      // Listen for popstate events (browser back/forward)
       window.addEventListener('popstate', handleUrlChange);
-
-      return () => {
-        window.removeEventListener('popstate', handleUrlChange);
-      };
+      return () => window.removeEventListener('popstate', handleUrlChange);
     }
-  }, [syncWithUrl, urlFiltersKey, deserializeUrlFilters]);
+  }, [
+    syncWithUrl,
+    urlFiltersKey,
+    encodeUrlFilters,
+    memoizedFiltersConfig,
+    storage,
+  ]);
+
+  // Storage synchronization
+  useEffect(() => {
+    const saveToStorage = async () => {
+      if (filterSource !== 'url' && storage.type !== 'none') {
+        await storageManager.save({
+          filters,
+          timestamp: Date.now(),
+        });
+      }
+    };
+
+    saveToStorage();
+  }, [filters, filterSource, storage]);
 
   // Memoize update filter function
   const updateFilter = useCallback(
@@ -236,7 +280,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
           [key]: convertedValue,
         } as Partial<FilterValues<TConfig>>;
 
-        // Update URL if needed
+        // Update URL if enabled
         if (syncWithUrl) {
           const urlParams = new URLSearchParams(window.location.search);
           urlParams.set(
@@ -245,6 +289,9 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
           );
           const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
           window.history.pushState({}, '', newUrl);
+          setFilterSource('url');
+        } else {
+          setFilterSource('storage');
         }
 
         return newFilters;
@@ -311,6 +358,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       // Update cache
       cache.current.set(cacheKey, {
         data: result,
+        source: filterSource,
         timestamp: Date.now(),
       });
 
@@ -351,12 +399,25 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
 
   const clearStorage = useCallback(async () => {
     await storageManager.clear();
+    if (!syncWithUrl) {
+      setFilters({});
+      setFilterSource('default');
+    }
+  }, [storageManager, syncWithUrl]);
+
+  const resetToDefaults = useCallback(() => {
     setFilters({});
-    pushHistory({
-      filters: {},
-      timestamp: Date.now(),
-    });
-  }, [storageManager, pushHistory]);
+    setFilterSource('default');
+
+    if (syncWithUrl) {
+      const urlParams = new URLSearchParams(window.location.search);
+      urlParams.delete(urlFiltersKey);
+      const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
+      window.history.pushState({}, '', newUrl);
+    }
+
+    clearStorage();
+  }, [clearStorage, syncWithUrl, urlFiltersKey]);
 
   return {
     filters,
@@ -364,12 +425,14 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     loading,
     error,
     data,
+    filterSource,
     exportFilters,
     importFilters,
     fetchData: fetchFilteredData,
     storage: {
       clear: clearStorage,
     },
+    resetToDefaults,
     history: {
       undo,
       redo,

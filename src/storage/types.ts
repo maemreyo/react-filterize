@@ -5,6 +5,13 @@ export interface StorageAdapter {
   clear: () => Promise<void>;
 }
 
+export interface SyncStorageAdapter extends StorageAdapter {
+  getItemSync: (key: string) => string | null;
+  setItemSync: (key: string, value: string) => void;
+  removeItemSync: (key: string) => void;
+  clearSync: () => void;
+}
+
 export interface StorageConfig {
   type: 'local' | 'session' | 'memory' | 'none';
   prefix?: string;
