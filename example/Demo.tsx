@@ -166,7 +166,7 @@
 //     config,
 //     fetch: mockApi,
 //     options: {
-//       syncWithUrl: true,
+//       syncUrl: true,
 //       encodeUrlFilters: true,
 //       urlFiltersKey: 'f',
 //       storage: {
