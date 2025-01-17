@@ -68,7 +68,7 @@ const ProductControl: React.FC = () => {
   console.log('config', config);
 
   // Mock API function
-  const fetchFilteredData = async (filters: any) => {
+  const fetch = async (filters: any) => {
     const delay = Math.random() * 1000 + 500;
     await new Promise(resolve => setTimeout(resolve, delay));
 
@@ -94,9 +94,10 @@ const ProductControl: React.FC = () => {
     error,
     data: products,
     filterSource,
+    fetch: refetch,
   } = useFilterize({
     config,
-    fetch: fetchFilteredData,
+    fetch,
     options: {
       syncUrl: true,
       urlKey: 'pf',
@@ -117,7 +118,10 @@ const ProductControl: React.FC = () => {
 
   return (
     <Container>
+      <h1>Product Control</h1>
+
       <Filters filters={filters} setFilters={handleFilterChange} />
+      <button onClick={refetch}>Refetch</button>
       <Error isHidden={!error}>
         {error?.message || 'An error occurred while fetching the data.'}
       </Error>
