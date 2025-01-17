@@ -189,27 +189,6 @@ export type FilterValues<T extends FilterConfig[]> = {
   [P in ExtractKeys<T[number]>]: FilterOutput<GetConfigForKey<T, P>>;
 };
 
-// export interface FetchConfig {
-//   /**
-//    * Dependencies array that will trigger a fetch when changed
-//    */
-//   dependencies?: any[];
-//   /**
-//    * Debounce time in milliseconds for fetch requests
-//    * @default 300
-//    */
-//   debounceTime?: number;
-//   /**
-//    * Default filters to use when resetting
-//    */
-//   defaultValues?: Record<string, any>;
-//   /**
-//    * Whether to fetch data when filters are empty
-//    * @default false
-//    */
-//   fetchOnEmpty?: boolean;
-// }
-
 export interface UseFilterizeProps<TConfig extends FilterConfig[]> {
   config: TConfig;
   fetch: (filters: Partial<FilterValues<TConfig>>) => Promise<any>;

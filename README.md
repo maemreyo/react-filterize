@@ -12,12 +12,6 @@
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Best Practices](#best-practices)
-  - [1. Filter Configuration](#1-filter-configuration)
-  - [2. Performance Optimization](#2-performance-optimization)
-  - [3. Error Handling](#3-error-handling)
-  - [4. URL Synchronization](#4-url-synchronization)
-  - [5. Retry](#5-retry)
-  - [6. Transformations](#6-transformations)
 - [Examples](#examples)
 - [API Reference](#api-reference)
 - [Troubleshooting](#troubleshooting)
@@ -27,32 +21,30 @@
 
 ## Installation
 
-To install `@matthew.ngo/react-filterize`, run the following command:
+To install `react-filterize`, you need to use npm or yarn:
 
 ```bash
 npm install @matthew.ngo/react-filterize
 ```
+
 or
+
 ```bash
 yarn add @matthew.ngo/react-filterize
 ```
 
 ## Quick Start
 
-Here's a simple example of how to use `useFilterize`:
+Here's a basic example of how to use `react-filterize`:
 
-```javascript
+```tsx
 // example/ProductControl.tsx
 import React from 'react';
 import styled from 'styled-components';
 import Filters from './Filters';
-import ProductsGrid from './ProductGrid';
+import ProductsGrid from './ProductsGrid';
 import { dummyData } from './data';
-import {
-  useFilterize,
-  addFilter,
-  ValueTypes,
-} from '@matthew.ngo/react-filterize';
+import { useFilterize, addFilter } from '@matthew.ngo/react-filterize';
 
 const Container = styled.div`
   padding: 20px;
@@ -79,7 +71,7 @@ const Loading = styled.div`
 `;
 
 const ProductControl: React.FC = () => {
-  // Define filter configuration
+  // Define filter configurations
   const config = [
     addFilter({
       key: 'search',
@@ -97,7 +89,6 @@ const ProductControl: React.FC = () => {
       key: 'minPrice',
       label: 'Min Price',
       defaultValue: 0,
-      type: ValueTypes.NUMBER
     }),
     addFilter({
       key: 'maxPrice',
@@ -112,7 +103,7 @@ const ProductControl: React.FC = () => {
   ];
 
   // Mock API function
-  const fetchFilteredData = async (filters: any) => {
+  const fetch = async (filters: any) => {
     const delay = Math.random() * 1000 + 500;
     await new Promise(resolve => setTimeout(resolve, delay));
 
@@ -138,17 +129,27 @@ const ProductControl: React.FC = () => {
     error,
     data: products,
     filterSource,
+    refetch,
+    reset,
   } = useFilterize({
     config,
-    fetch: fetchFilteredData,
+    fetch,
     options: {
-      syncUrl: true,
-      urlKey: 'pf',
+      url: {
+        key: 'search',
+      },
       autoFetch: true,
+      fetch: {
+        fetchOnEmpty: true,
+      },
+      storage: {
+        type: 'local',
+        include: ['search'],
+      },
     },
   });
 
-  // Handle filter changes
+  // Handler for filter changes
   const handleFilterChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
@@ -158,7 +159,11 @@ const ProductControl: React.FC = () => {
 
   return (
     <Container>
+      <h1>Product Control</h1>
+
       <Filters filters={filters} setFilters={handleFilterChange} />
+      <button onClick={refetch}>Refetch</button>
+      <button onClick={reset}>Reset</button>
       <Error isHidden={!error}>
         {error?.message || 'An error occurred while fetching the data.'}
       </Error>
@@ -172,156 +177,235 @@ export default ProductControl;
 
 ```
 
+In this example, we use the `useFilterize` hook to manage the filter state and fetch data.
+
+1. Define the filter configuration with `config`.
+2. The `fetch` function simulates calling an API to get data based on the current filters.
+3. Use `useFilterize` to initialize the state and update functions.
+4. Render the `Filters` component to display the filters.
+5. Use the `ProductsGrid` component to display the list of products.
+6. Display the loading and error status.
+
 ## Best Practices
 
-### 1. Filter Configuration
-
--   Use `addFilter` to create configurations for each filter. This helps you easily manage the data type and other attributes of the filter.
--   Use the `transform` property to normalize the filter input data. For example, convert the search string to lowercase.
-
-    ```javascript
-    addFilter({
-      key: 'search',
-      label: 'Search',
-      defaultValue: '',
-      transform: (value: string) => value.toLowerCase(),
-    });
-    ```
-
--   Set `defaultValue` according to the data type of the filter.
--   For array `defaultValue` (empty or not), you can omit `type` key or explicitly set `type` to corresponding value:
-    ```javascript
-    addFilter({
-        key: 'stringArr',
-        defaultValue: [] // or ['a', 'b']
-        // inferred type: string[]
-        // type: ValueTypes.STRING_ARRAY // optional
-      })
-
-      addFilter({
-        key: 'numberArr',
-        defaultValue: [] // or [1, 2]
-        // inferred type: number[]
-        // type: ValueTypes.NUMBER_ARRAY // optional
-      })
-
-      addFilter({
-        key: 'dateArr',
-        defaultValue: [] // or [new Date()]
-        // inferred type: date[]
-        // type: ValueTypes.DATE_ARRAY // optional
-      })
-
-      addFilter({
-        key: 'fileArr',
-        defaultValue: []
-        // inferred type: file[]
-        // type: ValueTypes.FILE_ARRAY // optional
-      })
-    ```
-### 2. Performance Optimization
-
--   Use `debounce` in `FilterConfig` to delay updating the filter until the user has stopped typing for a certain period. This helps reduce the number of unnecessary API calls.
-
-    ```javascript
-      addFilter({
-        key: 'search',
-        label: 'Search',
-        defaultValue: '',
-        debounce: 300, // Debounce time in milliseconds
-      });
-    ```
--   Use `useMemo` to memoize the results of expensive calculations, such as filtering data.
--   Use `useCallback` to avoid unnecessary re-renders of child components.
--   Leverage the built-in caching feature of `useFilterize` with the `cacheTimeout` option.
-
-### 3. Error Handling
-
--   The `Error` component is provided to display error messages when an error occurs during the data fetching process.
--   Use the `error` state returned by `useFilterize` to display error messages to the user.
-
-    ```tsx
-    <Error isHidden={!error}>
-        {error?.message || 'An error occurred while fetching the data.'}
-    </Error>
-    ```
-### 4. URL Synchronization
-
--   Use the option `syncUrl: true` to synchronize the filter state with the URL. This allows users to share filtered links and return to the previous state using the browser's "back" button.
--   Customize `urlKey` to change the default query parameter key ('filters').
--   Set `encode: true` (default) to encode filters in the URL using base64, avoiding special characters. Set it to `false` if you don't want to encode and keep filters as a `URLSearchParams` object.
-
-### 5. Retry
-
--   Configure the `retry` options with the number of `attempts` and `delay` to automatically retry when fetching data fails.
--   `backoff`: Enable `backoff` mode (`true` by default) to increase the delay after each retry.
-
-### 6. Transformations
-
--   Configure the `input` and `output` functions in the `transform` option to transform data before and after fetching.
--   The `input` function is used to change `filters` before passing them to the `fetch` function.
--   The `output` function is used to change `data` returned from `fetch` before saving it to the state.
+-   **Use `addFilter` to declare filters:** Use the `addFilter` function to define filters instead of directly declaring objects. This helps to automatically infer data types and ensures type safety.
+-   **Separate data fetching logic:** Separate data fetching logic from the main component, making the code easier to read and maintain. Create separate fetch functions or custom hooks to manage data fetching.
+-   **Use `transform`:** Use the `transform` function to standardize the filter data before applying it, ensuring consistency. For example, convert search strings to lowercase.
+-   **Manage URL and Storage:** Leverage the feature to synchronize with the URL or storage to save the filter state, so users don't have to re-enter the filter every time the page reloads.
+-   **Optimize performance:** Use `debounceTime` in the `options` of `useFilterize` to avoid calling the API too frequently when users change filters. Consider using `cacheTimeout` to cache search results for a certain period.
+-   **Error handling:** Always handle potential errors that may occur during data fetching. Display error messages to the user and provide options to retry.
+- **Use `transform` in the `config` of `addFilter`:** Use it to transform input data (for example, converting strings to lowercase, standardizing date formats).
 
 ## Examples
 
-The `example` directory contains a complete example of using `@matthew.ngo/react-filterize` with React, styled-components, and TypeScript. You can refer to the code in this directory to better understand how to use the library.
+### Filtering products by multiple criteria
+
+```tsx
+// ... imports
+
+const config = [
+  addFilter({
+    key: 'name',
+    label: 'Product Name',
+    defaultValue: '',
+    transform: (value: string) => value.toLowerCase(),
+  }),
+  addFilter({
+    key: 'status',
+    label: 'Status',
+    type: ValueTypes.BOOLEAN,
+    defaultValue: null,
+  }),
+  addFilter({
+    key: 'minPrice',
+    label: 'Minimum Price',
+    type: ValueTypes.NUMBER,
+    defaultValue: 0,
+  }),
+  addFilter({
+    key: 'maxPrice',
+    label: 'Maximum Price',
+    type: ValueTypes.NUMBER,
+    defaultValue: null,
+  }),
+];
+
+const fetchProducts = async (filters: any) => {
+  // Simulate API call
+  const delay = Math.random() * 500 + 200;
+  await new Promise(resolve => setTimeout(resolve, delay));
+
+  return dummyData.filter(product => {
+    const nameMatch = filters.name
+      ? product.name.toLowerCase().includes(filters.name)
+      : true;
+    const statusMatch =
+      filters.status !== null ? product.status === filters.status : true;
+    const priceMatch =
+      product.price >= filters.minPrice &&
+      (filters.maxPrice ? product.price <= filters.maxPrice : true);
+
+    return nameMatch && statusMatch && priceMatch;
+  });
+};
+
+// ... component using useFilterize with config and fetchProducts
+```
+
+### Using a Custom Input Component
+
+```tsx
+// ... imports
+
+const CustomInput = ({ value, onChange }) => (
+  <input
+    type="text"
+    value={value || ''}
+    onChange={e => onChange(e.target.value)}
+    placeholder="Custom Input"
+  />
+);
+
+const config = [
+  addFilter({
+    key: 'custom',
+    label: 'Custom Filter',
+    defaultValue: '',
+    component: CustomInput,
+  }),
+];
+
+// ... component using useFilterize with config
+```
+
+### Synchronizing with the URL
+
+```tsx
+// ... imports
+
+const { filters, updateFilter, loading, error, data } = useFilterize({
+  config: [
+    // ... filter configurations
+  ],
+  fetch: /* ... your fetch function */,
+  options: {
+    url: {
+      key: 'f', // Optional: Specify a custom key for URL params
+      encode: true, // Optional: Encode the filter values in the URL
+      mergeParams: true,
+      namespace: 'productFilters',
+      serialize: filters => JSON.stringify(filters), // Optional: Custom serialization function for URL
+      deserialize: query => JSON.parse(query), // Optional: Custom deserialization function for URL
+    },
+  },
+});
+```
+
+### Storing in Local Storage
+
+```tsx
+// ... imports
+
+const { filters, updateFilter, loading, error, data } = useFilterize({
+  config: [
+    // ... filter configurations
+  ],
+  fetch: /* ... your fetch function */,
+  options: {
+    storage: {
+      type: 'local', // Or 'session' for sessionStorage
+      key: 'my-app-filters', // Optional: Specify a custom key for storage
+      version: '1.0.0',
+      compress: false, // Whether to compress stored data (default: false)
+    },
+  },
+});
+```
+
+### Using cache
+
+```tsx
+const { filters, updateFilter, loading, error, data } = useFilterize({
+  config: [
+    // ... filter configurations
+  ],
+  fetch: /* ... your fetch function */,
+  options: {
+    cacheTimeout: 5 * 60 * 1000, // Cache results for 5 minutes
+  },
+});
+```
 
 ## API Reference
 
 ### `useFilterize`
 
-The main hook for using `@matthew.ngo/react-filterize`.
+The main hook for managing the filter state and fetching data.
 
-**Props:**
+#### Props
 
-| Prop         | Type                                                           | Description                                                                                           | Default                                                                   |
-| :----------- | :------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------ |
-| `config` | `FilterConfig[]`                                              | An array of filter configurations.                                                                    | `[]`                                                                      |
-| `fetch`    | `(filters: Partial<FilterValues<TConfig>>) => Promise<any>` | A function that fetches data based on the current filters.                                            | `undefined`                                                               |
-| `options`      | `UseFilterizeProps<TConfig>['options']`                    | Additional options.                                                                                  | `{ syncUrl: false, urlKey: 'filters', encode: true, autoFetch: true, storage: { type: 'none' }}` |
+| Prop      | Type                                           | Description                                                                                                                                     |
+| --------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config`  | `FilterConfig[]`                               | An array of configurations for each filter. See also `FilterConfig`.                                                                         |
+| `fetch`   | `(filters: any) => Promise<any>`              | A function that fetches data based on the current filter values.                                                                               |
+| `options` | `{ url?: UrlConfig \| boolean, storage?: StorageConfig, cacheTimeout?: number, autoFetch?: boolean, transform?: TransformConfig, fetch?: FetchConfig }` | Configuration options for `useFilterize`. Includes `url` (synchronization with URL), `storage` (storage), `cacheTimeout` (cache time), `autoFetch` (auto-fetch when filter changes), `transform`, `fetch` |
 
-**Return Value:**
+#### Return Value
 
-| Property        | Type                                                                                              | Description                                                                           |
-| :-------------- | :------------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------------ |
-| `filters`       | `Partial<FilterValues<TConfig>>`                                                                | An object containing the current values of the filters.                                |
-| `updateFilter`  | `<K extends keyof FilterValues<TConfig>>(key: K, value: FilterValues<TConfig>[K]) => void`     | A function to update the value of a specific filter.                                 |
-| `loading`       | `boolean`                                                                                         | The loading state of the data fetching process.                                       |
-| `error`         | `Error \| null`                                                                                 | The error that occurred during the data fetching process (if any).                   |
-| `data`          | `any`                                                                                           | The data fetched from the API.                                                        |
-| `filterSource`  | `FilterSource`                                                                               | The source of current filter values: 'url', 'storage' or 'default'.               |
-| `exportFilters` | `() => { filters: string }`                                                                       | Function to export filters as a serialized string.                                    |
-| `importFilters` | `(data: { filters: string, groups?: string[] }) => void`                                      | Function to import filters from a serialized string.                                  |
-| `fetch`     | `() => Promise<void>`                                                                          | Function to re-fetch data from API with current filters                               |
-| `storage`       | `{ clear: () => Promise<void> }`                                                                | Function to clear storage                                                              |
-| `reset` | `() => void` | Function to reset filters to `defaultValue` |
-| `history` | `{ undo: () => void; redo: () => void; canUndo: boolean; canRedo: boolean; current: FilterHistoryState<Partial<FilterValues<TConfig>>>; past: FilterHistoryState<Partial<FilterValues<TConfig>>>[]; future: FilterHistoryState<Partial<FilterValues<TConfig>>>[] }` | Functions and states to manage filters change history (undo, redo, etc.) |
+| Property          | Type                                     | Description                                                                                       |
+| ----------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `filters`         | `Partial<FilterValues<TConfig>>`         | The current values of all filters.                                                                 |
+| `updateFilter`    | `(key, value) => void`                  | A function to update the value of a filter.                                                      |
+| `loading`         | `boolean`                                | The loading status of the most recent data fetch.                                                 |
+| `error`           | `Error \| null`                          | The error of the most recent data fetch (if any).                                                  |
+| `data`            | `any`                                    | The data returned from the `fetch` function.                                                       |
+| `filterSource` | `FilterSource` | The source of the current filter ('url', 'storage', 'default', 'none'). |
+| `refetch`         | `() => Promise<void>`                    | Calls the `fetch` function again with the current filter values.                                    |
+| `reset`           | `() => void`                             | Resets all filters to their default values.                                                       |
+| `exportFilters`   | `() => { filters: string }`              | Returns the filters as a serialized string                                                            |
+| `importFilters`   | `(data: { filters: string; groups?: string[] }) => void` | Sets the filters from a serialized string.                                                            |
+| `storage`         | `{ clear: () => Promise<void> }`         | Provides a `clear` function to clear storage.                                                       |
+| `history`         | `{ undo: () => void, redo: () => void, canUndo: boolean, canRedo: boolean, current: FilterHistoryState<T>, past: FilterHistoryState<T>[], future: FilterHistoryState<T>[] }`          | The history of filter changes, allowing undo/redo.                                                |
+|`fetchState`|`FetchState`| The state of the last fetch. |
+| `validateRequiredFilters`         | `any`                                | Function to check if all required filters have been set. |
 
 ### `addFilter`
 
-A utility function to create a configuration for a filter.
+A helper function to create a configuration for a filter.
 
-**Parameters:**
+#### Signature
 
--   `config`: `FilterConfigWithoutType<T>`: An object containing the properties of the filter:
-    -   `key`: `string` (required): The name of the filter.
-    -   `label`: `string` (optional): The label of the filter, displayed in the UI.
-    -   `defaultValue`: `T` (optional): The default value of the filter.
-    -   `type`: `ValueTypeKey` (optional): The data type of the filter, inferred from `defaultValue` if `type` is not explicitly passed.
-    -   `dependencies`?: `Record<string,(value: T extends null | undefined ? any : T) => any>` (optional): An object defining dependencies and corresponding dependency handling functions, see example [here](#dependencies).
-    -   `transform`: `(value: T) => any` (optional): A function to normalize the value of the filter.
-    -   `debounce`: `number` (optional): The debounce time (in milliseconds) for the filter.
-    -   `required`?: `boolean` (optional): Whether the filter is required or not.
-    -   `hidden`?: `boolean` (optional): Whether the filter is hidden or not.
-    -   `disabled`?: `boolean` (optional): Whether the filter is disabled or not.
+```typescript
+function addFilter<T extends DefaultValue, Type extends ValueTypeKey = InferValueType<NonNullable<T>>>(
+  config: Omit<FilterConfigWithoutType<T>, 'type'> & { type?: Type }
+): FilterConfig;
+```
 
-**Return Value:**
+#### Parameters
 
-`FilterConfig`: An object containing the complete configuration of the filter.
+| Parameter  | Type                                     | Description                                                      |
+| ---------- | ---------------------------------------- | ---------------------------------------------------------------- |
+| `config`   | `FilterConfig`                           | The configuration for the filter.                                 |
 
-### `ValueTypes`
+#### `FilterConfig`
 
-An enum containing the supported data types for filters:
+| Property       | Type                      | Description                                                                                                   |
+| -------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `key`          | `string`                  | The name of the filter (unique).                                                                              |
+| `label`        | `string`                  | The display label of the filter (optional).                                                                   |
+| `type`         | `ValueTypeKey`              | The data type of the filter. Defaults to the type inferred from `defaultValue`                             |
+| `defaultValue` | `any`                     | The default value of the filter.                                                                              |
+| `component`    | `React.ComponentType<any>` | A custom component to render the filter (optional).                                                           |
+| `dependencies` |`Record<string, (value: any) => Promise<any> \| any>`| An object containing the dependency processing functions for the filter. |
+| `transform`    | `(value: any) => any`      | A function to transform the value of the filter before applying it (e.g., converting a string to lowercase) (optional).      |
+| `description`  | `string`                  | Description of the filter (optional).                                                                          |
+| `required`     | `boolean`                 | Indicates whether the filter is required (optional).                                                                 |
+| `hidden`       | `boolean`                 | Hides the filter from the UI (optional).                                                                           |
+| `disabled`     | `boolean`                 | Disables the filter (optional).                                                                              |
+
+#### `ValueTypes`
+
+Enum defining the supported data types:
 
 ```typescript
 export const ValueTypes = {
@@ -337,103 +421,115 @@ export const ValueTypes = {
 } as const;
 ```
 
+### `UrlConfig`
+
+| Property       | Type                                    | Description                                                                            |
+| -------------- | --------------------------------------- | -------------------------------------------------------------------------------------- |
+| `key`          | `string`                                | Key prefix for URL parameters. Defaults to `filters`.                                  |
+| `encode`       | `boolean`                               | Whether to encode/decode URL parameters. Defaults to `true`.                            |
+| `mergeParams`  | `boolean`                               | Whether to merge with existing URL params. Defaults to `true`.                           |
+| `namespace`    | `string`                                | Namespace for multiple filter instances on the same page.                                |
+| `serialize`    | `(filters: Record<string, any>) => string` | Function to serialize filters into a string for the URL.                                |
+| `deserialize`  | `(query: string) => Record<string, any>` | Function to deserialize filters from a URL string.                                    |
+| `transformers` | `Record<string, (value: any) => string>` | Transformation functions for specific filter keys.                                     |
+
+### `StorageConfig`
+
+| Property            | Type                                                    | Description                                                                    |
+| ------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `type`              | `'local' \| 'session' \| 'memory' \| 'none'`              | Type of storage to use. Defaults to `none`.                                        |
+| `key`               | `string`                                                | Key prefix for storage. Defaults to `filterize`.                                  |
+| `version`           | `string`                                                | Version of the storage data.                                                     |
+| `migrations`        | `MigrationStrategy[]`                                  | Array of migration strategies for upgrading the data version.                     |
+| `include`           | `string[]`                                              | List of fields to include in storage. If empty, all fields are included.       |
+| `exclude`           | `string[]`                                              | List of fields to exclude from storage.                                        |
+| `compress`          | `boolean`                                               | Whether to compress stored data. Defaults to `false`.                              |
+| `serialize`         | `(data: any) => string`                                  | Function to serialize data before storing it.                                    |
+| `deserialize`       | `(data: string) => any`                                  | Function to deserialize data after retrieving it from storage.                   |
+| `onMigrationComplete` | `(oldVersion: string, newVersion: string, data: any) => void` | Callback function called after migration is complete.                           |
+
+### `FetchConfig`
+
+| Property           | Type                                                 | Description                                                                                    |
+| ------------------ | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `dependencies`     | `any[]`                                              | Array of dependencies. `fetch` will be called again when these values change.                |
+| `debounceTime`     | `number`                                             | Debounce time (in milliseconds) for `fetch` calls. Defaults to 300.                           |
+| `defaultValues`    | `Record<string, any>`                                | Default filter values when resetting.                                                         |
+| `fetchOnEmpty`     | `boolean`                                            | Whether to fetch data when no filters are applied. Defaults to `false`.                     |
+| `requiredFilters` | `string[]` | Array of filter keys that must have a value (non-null, non-undefined) for `fetch` to occur. |
+| `shouldFetch`     | `(filters: Record<string, any>) => boolean \| Promise<boolean>` | Function to check `fetch` conditions.                                                            |
+| `beforeFetch`      | `(filters: Record<string, any>) => Record<string, any> \| Promise<Record<string, any>>` | Function to transform filters before `fetch`.                                                     |
+| `onMissingRequired` | `(missingFilters: string[]) => void`                   | Callback function called when `requiredFilters` are missing.                                     |
+| `onFetchPrevented`  | `(filters: Record<string, any>) => void`              | Callback function called when `shouldFetch` returns `false`.                                    |
+
 ## Troubleshooting
 
-**Issue:** `Circular dependency detected...` error
+### Error "Circular dependency detected..."
 
-**Solution:** Check the `dependencies` option of the `FilterConfigs` to make sure there are no circular dependencies. For example, you should not declare filter A depends on filter B, filter B depends on filter C, and filter C depends on filter A.
+This error occurs when there is a circular dependency between filters. For example, filter A depends on filter B, filter B depends on filter C, and filter C depends on filter A.
 
-**Issue:** Data is not being fetched
+**Solution:** Review the `dependencies` in the `FilterConfig` of the filters and ensure that there are no circular dependencies.
 
-**Solution:**
+### Data is not updated when changing the filter
 
--   Check the `fetch` function and make sure it returns the correct data.
--   Check for network errors.
--   Use `console.log` to debug the values of filters and data.
--   Make sure the `autoFetch` option is set to `true` (default) or call `fetch` function from `useFilterize` return value manually.
+*   Check if the `fetch` function is using the latest filter values.
+*   Check if the `dependencies` in the `useFilterize` options are configured correctly.
+*   Make sure the `key` of each `FilterConfig` is unique.
+*   Check if you have passed the correct `updateFilter` function to the filter components.
 
-**Issue:** Filters are not in sync with the URL
+### Error "Uncaught TypeError: Cannot read properties of undefined..."
 
-**Solution:**
+*   Check if the components are accessing the properties of `filters`, `data`, or `error` correctly, ensuring that they are initialized.
+*   Make sure the `fetch` function is returning data in the correct format.
 
--   Make sure the `syncUrl` option is enabled.
--   Check if `urlKey` is configured correctly.
--   In case of `encode: false`, filters are stored as a `URLSearchParams` object, the `key` corresponds to `FilterConfig.key`, `value` will be the serialized value of the corresponding filter.
+### Storage-related errors
 
-**Issue:** Filter value is incorrect
-
-**Solution:**
-
--   Check `defaultValue` of `FilterConfig`.
--   Check the `transform` function, if any.
--   Check the dependencies, make sure the `defaultValue` of the dependent filter is correct, and the dependency functions handle the logic correctly.
+*   Check if the `storage` options are configured correctly, including `type`, `key` (if using `local` or `session`), and `include`/`exclude` (if necessary).
+*   Make sure the browser supports the type of storage you are using (localStorage or sessionStorage).
 
 ## Contributing
 
-If you want to contribute to `@matthew.ngo/react-filterize`, please create a pull request on GitHub.
+We welcome all contributions to `react-filterize`! If you would like to contribute, please follow these steps:
 
-Contribution steps:
+1. Fork this repository.
+2. Create a new branch for your feature/bugfix: `git checkout -b feature/your-feature` or `git checkout -b bugfix/your-bugfix`.
+3. Make the necessary changes.
+4. Write tests for your changes.
+5. Make sure all tests pass: `npm test` or `yarn test`.
+6. Create a pull request to the `main` branch of this repository.
 
-1. Fork the repository.
-2. Create a new branch.
-3. Make changes.
-4. Write tests for the changes.
-5. Make sure all tests pass.
-6. Create a pull request.
+Please ensure that your pull request adheres to the following guidelines:
+
+*   Clearly describe your changes.
+*   Include tests for your changes.
+*   Your code must follow the project's style guide.
 
 ## License
 
-MIT License
-
-Copyright (c) 2023 Matthew Ngo
+`react-filterize` is released under the MIT license. See the `LICENSE` file for more details.
 
 ## FAQs
 
-**Q:** Does `@matthew.ngo/react-filterize` support TypeScript?
+### 1. How do I set the initial value for a filter from the URL?
 
-**A:** Yes, `@matthew.ngo/react-filterize` is written in TypeScript and provides complete type definitions.
+`useFilterize` will automatically get the filter value from the URL if you configure `url: true` in the `options`. You can also provide `key` to customize the parameter name in the URL.
 
-**Q:** Can I use `@matthew.ngo/react-filterize` with frameworks other than React?
+### 2. Can I use `react-filterize` with frameworks other than React?
 
-**A:** No, `@matthew.ngo/react-filterize` is designed to be used with React.
+No, `react-filterize` is designed to work with React and uses React Hooks.
 
-**Q:** How can I customize the UI of the filters?
+### 3. How do I clear storage?
 
-**A:** You can create your own filter components and use the `updateFilter` function returned by `useFilterize` to update the values of the filters. See the example in `example/Filters.tsx` and `example/ProductControl.tsx`.
+You can use the `storage.clear` function returned from the `useFilterize` hook to delete the storage. For example:
 
-**Q:** What is the purpose of the `dependencies` option in `FilterConfig`?
+```tsx
+const { storage } = useFilterize(...);
 
-**A:** The `dependencies` option allows you to define dependent filters (dependencies) and functions to calculate the filter value based on these dependencies. For example:
+// ...
 
-```typescript
-// FilterConfig for the 'category' filter
-addFilter({
-  key: 'category',
-  label: 'Category',
-  defaultValue: '',
-  type: ValueTypes.STRING,
-});
-
-// FilterConfig for the 'subCategory' filter that depends on 'category'
-addFilter({
-  key: 'subCategory',
-  label: 'Sub-Category',
-  defaultValue: '',
-  type: ValueTypes.STRING,
-  dependencies: {
-    category: (categoryValue) => {
-      // logic to get the list of sub-categories based on categoryValue
-      // For example:
-      if (categoryValue === 'electronics') {
-        return ['phones', 'laptops', 'tablets'];
-      } else if (categoryValue === 'books') {
-        return ['fiction', 'non-fiction', 'science-fiction'];
-      } else {
-        return [];
-      }
-    },
-  },
-});
+<button onClick={() => storage.clear()}>Clear Storage</button>
 ```
 
-In this example, the `subCategory` filter depends on the `category` filter. When the value of the `category` filter changes, the corresponding dependency function will be called to calculate the new value for the `subCategory` filter. Please note that the values returned from the dependency function need to match the declared `defaultValue` (e.g., `''` or `[]`).
+### 4. Can I change the display order of the filters?
+
+The display order of the filters depends on the order of the `FilterConfig` in the `config` array that you pass to `useFilterize`. You can change the order of the elements in this array to change the display order.
