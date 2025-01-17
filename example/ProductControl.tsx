@@ -96,8 +96,9 @@ const ProductControl: React.FC = () => {
     config,
     fetch,
     options: {
-      syncUrl: true,
-      urlKey: 'pf',
+      url: {
+        key: 'search',
+      },
       autoFetch: true,
       fetch: {
         fetchOnEmpty: true,

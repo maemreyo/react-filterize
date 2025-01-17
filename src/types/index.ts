@@ -1,4 +1,5 @@
 import { StorageConfig } from '../storage/types';
+import { UrlConfig } from './url';
 
 export const ValueTypes = {
   STRING: 'string',
@@ -211,17 +212,12 @@ export interface UseFilterizeProps<TConfig extends FilterConfig[]> {
   config: TConfig;
   fetch: (filters: Partial<FilterValues<TConfig>>) => Promise<any>;
   options?: {
-    syncUrl?: boolean;
-    urlKey?: string;
-    encode?: boolean;
+    url?: UrlConfig | boolean;
+    storage?: StorageConfig;
     cacheTimeout?: number;
     autoFetch?: boolean;
-    storage?: StorageConfig;
     retry?: RetryConfig;
     transform?: TransformConfig;
-    /**
-     * Configuration for fetch behavior
-     */
     fetch?: FetchConfig;
   };
 }

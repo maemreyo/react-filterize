@@ -19,13 +19,18 @@ import { DataTransformer } from '../utils/transform';
 import { useFilterHistory } from './useFilterHistory';
 import { withRetry } from '../utils/retry';
 import { detectCircularDependencies } from '../utils/dependency';
+import { UrlManager } from '../utils/url';
 
 export const useFilterize = <TConfig extends FilterConfig[]>({
   config: fConfig,
   options = {},
   fetch,
 }: UseFilterizeProps<TConfig>): UseFilterizeReturn<TConfig> => {
-  console.log('[useFilterize] Initializing useFilterize hook');
+  // Initialize URL manager if URL sync is enabled
+  const urlManager = useMemo(() => {
+    if (!options.url) return null;
+    return new UrlManager(typeof options.url === 'boolean' ? {} : options.url);
+  }, [options.url]);
 
   const memoizedFiltersConfig = useMemo(() => fConfig, []);
   const memoizedOptions = useMemo(
@@ -99,19 +104,15 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
 
   // State management
   const [filters, setFilters] = useState<Partial<FilterValues<TConfig>>>(() => {
-    // Priority order: URL > Storage > Default
-    if (syncUrl) {
-      const urlParams = new URLSearchParams(window.location.search);
-      const encodedFilters = urlParams.get(urlKey);
-      if (encodedFilters) {
+    if (urlManager) {
+      const urlFilters = urlManager.getFiltersFromUrl();
+      if (urlFilters) {
         setFilterSource('url');
-        return deserializeUrlFilters(encodedFilters) as Partial<
-          FilterValues<TConfig>
-        >;
+        return urlFilters as Partial<FilterValues<TConfig>>;
       }
     }
 
-    // Try loading from storage if no URL parameters
+    // Fallback to storage or defaults...
     const storedData = storageManager.loadSync();
     if (storedData?.filters) {
       setFilterSource('storage');
@@ -143,6 +144,35 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       [filters]
     )
   );
+
+  // Update URL when filters change
+  useEffect(() => {
+    if (urlManager && filterSource !== 'url') {
+      urlManager.updateUrl(filters);
+    }
+  }, [filters, filterSource]);
+
+  // Listen to URL changes (e.g., browser back/forward)
+  useEffect(() => {
+    if (!urlManager) return;
+
+    const handleUrlChange = () => {
+      const urlFilters = urlManager.getFiltersFromUrl();
+      if (urlFilters) {
+        setFilters(urlFilters as Partial<FilterValues<TConfig>>);
+        setFilterSource('url');
+      } else if (storage.type !== 'none') {
+        const storedData = storageManager.loadSync();
+        if (storedData?.filters) {
+          setFilters(storedData.filters as Partial<FilterValues<TConfig>>);
+          setFilterSource('storage');
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handleUrlChange);
+    return () => window.removeEventListener('popstate', handleUrlChange);
+  }, [urlManager]);
 
   // Memoize update history function
   const updateHistoryForFilters = useCallback(
@@ -413,24 +443,21 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     }
   }, [storageManager, syncUrl]);
 
+  // Update reset function
   const reset = useCallback(() => {
     const defaultValues = (fetchOptions.defaultValues as any) || ({} as any);
     setFilters(defaultValues);
     setFilterSource('default');
 
-    if (syncUrl) {
-      const urlParams = new URLSearchParams(window.location.search);
+    // Clear URL if URL sync is enabled
+    if (urlManager) {
       if (Object.keys(defaultValues).length > 0) {
-        // Sync defaultValues to URL if they exist
-        urlParams.set(urlKey, serializeFilters(defaultValues, encode));
+        urlManager.updateUrl(defaultValues);
       } else {
-        urlParams.delete(urlKey);
+        urlManager.clearUrl();
       }
-      const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
-      window.history.pushState({}, '', newUrl);
     }
 
-    // Sync with storage
     if (Object.keys(defaultValues).length > 0) {
       storageManager.save({
         filters: defaultValues,
@@ -439,7 +466,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     } else {
       clearStorage();
     }
-  }, [fetchOptions, clearStorage, syncUrl, urlKey, encode, storageManager]);
+  }, [fetchOptions, clearStorage, urlManager]);
 
   return {
     filters,
