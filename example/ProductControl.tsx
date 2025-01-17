@@ -92,6 +92,7 @@ const ProductControl: React.FC = () => {
     filterSource,
     refetch,
     reset,
+    fetchState,
   } = useFilterize({
     config,
     fetch,
@@ -105,12 +106,16 @@ const ProductControl: React.FC = () => {
         defaultValues: {
           search: 'hello',
         },
+        requiredFilters: ['rating'],
+        onMissingRequired: missingFilters => {
+          console.log('Missing required filters:', missingFilters);
+        },
       },
     },
   });
 
   console.log('filtesrs', filters);
-  console.log('filterSource', filterSource);
+  console.log('fetchState', fetchState);
 
   // Handler for filter changes
   const handleFilterChange = (

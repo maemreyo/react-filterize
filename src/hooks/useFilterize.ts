@@ -20,6 +20,8 @@ import { useFilterHistory } from './useFilterHistory';
 import { withRetry } from '../utils/retry';
 import { detectCircularDependencies } from '../utils/dependency';
 import { UrlManager } from '../utils/url';
+import { FetchState } from '../utils/state';
+import { FetchConfig } from '../utils/fetch';
 
 export const useFilterize = <TConfig extends FilterConfig[]>({
   config: fConfig,
@@ -33,6 +35,22 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
   }, [options.url]);
 
   const memoizedFiltersConfig = useMemo(() => fConfig, []);
+
+  // Memoized fetch options with defaults
+  const memoizedFetchOptions = useMemo(
+    () =>
+      ({
+        debounceTime: 300,
+        fetchOnEmpty: false,
+        defaultValues: {},
+        dependencies: [],
+        shouldFetch: () => true,
+        requiredFilters: [],
+        ...options.fetch,
+      } as FetchConfig),
+    [options.fetch]
+  );
+
   const memoizedOptions = useMemo(
     () => ({
       syncUrl: false,
@@ -83,11 +101,28 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     [options.transform]
   );
   const [filterSource, setFilterSource] = useState<FilterSource>('none');
-  const [fetchState, setFetchState] = useState({
+  const [fetchState, setFetchState] = useState<FetchState>({
     isInitialFetch: true,
-    lastFetchedAt: null as number | null,
+    lastFetchedAt: null,
+    preventedFetchCount: 0,
+    lastPreventedAt: null,
+    missingRequiredFilters: [],
   });
+
   const storageManager = useMemo(() => new StorageManager(storage), [storage]);
+
+  // Helper to check required filters
+  const validateRequiredFilters = useCallback(
+    (currentFilters: Partial<FilterValues<TConfig>>): string[] => {
+      return (
+        memoizedFetchOptions.requiredFilters?.filter(
+          // @ts-ignore
+          key => currentFilters[key] == null || currentFilters[key] === ''
+        ) || []
+      );
+    },
+    [memoizedFetchOptions.requiredFilters]
+  );
 
   // Helper function to deserialize URL filters
   const deserializeUrlFilters = useCallback(
@@ -319,45 +354,82 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     [memoizedFiltersConfig, syncUrl, urlKey, encode]
   );
 
-  // Memoize fetch function
+  // Enhanced fetchFilteredData
   const fetchFilteredData = useCallback(async () => {
     try {
-      setLoading(true);
-      setError(null);
+      // Skip if there are no filters and fetchOnEmpty is false
+      const shouldSkipEmpty =
+        !memoizedFetchOptions.fetchOnEmpty && Object.keys(filters).length === 0;
 
-      const activeFilters = {
-        ...filters,
-      };
-
-      const shouldSkipFetch =
-        !fetchOptions.fetchOnEmpty &&
-        Object.keys(activeFilters).length === 0 &&
-        !fetchOptions.defaultValues;
-
-      if (shouldSkipFetch) {
+      if (shouldSkipEmpty) {
+        setFetchState(prev => ({
+          ...prev,
+          preventedFetchCount: prev.preventedFetchCount + 1,
+          lastPreventedAt: Date.now(),
+        }));
+        memoizedFetchOptions.onFetchPrevented?.(filters);
         return;
       }
 
-      const cacheKey = JSON.stringify(activeFilters);
+      // Check required filters
+      const missingFilters = validateRequiredFilters(filters);
+      if (missingFilters.length > 0) {
+        setFetchState(prev => ({
+          ...prev,
+          missingRequiredFilters: missingFilters,
+          preventedFetchCount: prev.preventedFetchCount + 1,
+          lastPreventedAt: Date.now(),
+        }));
+        memoizedFetchOptions.onMissingRequired?.(missingFilters);
+        return;
+      }
+
+      // Check shouldFetch condition
+      // @ts-ignore
+      const shouldProceed = await memoizedFetchOptions.shouldFetch(filters);
+      if (!shouldProceed) {
+        setFetchState(prev => ({
+          ...prev,
+          preventedFetchCount: prev.preventedFetchCount + 1,
+          lastPreventedAt: Date.now(),
+        }));
+        memoizedFetchOptions.onFetchPrevented?.(filters);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      // Transform filters before fetch if needed
+      let transformedFilters = {
+        ...filters,
+      };
+      if (memoizedFetchOptions.beforeFetch) {
+        // @ts-ignore
+        transformedFilters = await memoizedFetchOptions.beforeFetch(
+          transformedFilters
+        );
+      }
+
+      const cacheKey = JSON.stringify(transformedFilters);
 
       // Check cache
       const cachedResult = cache.current.get(cacheKey);
       if (cachedResult && Date.now() - cachedResult.timestamp < cacheTimeout) {
         setData(cachedResult.data);
+        setFetchState(prev => ({
+          ...prev,
+          isInitialFetch: false,
+          lastFetchedAt: cachedResult.timestamp,
+          missingRequiredFilters: [],
+        }));
         return;
       }
 
-      // Validate filters
-      const isValid = await validateFilters(activeFilters, fConfig);
-      if (!isValid) {
-        throw new Error('Invalid filter configuration');
-      }
-
-      // Process dependencies
+      // Process filters with dependency checks
       const processedFilters = await Promise.all(
-        Object.entries(activeFilters).map(async ([key, value]) => {
+        Object.entries(transformedFilters).map(async ([key, value]) => {
           const config = fConfig.find(c => c.key === key);
-
           if (config?.dependencies) {
             const dependencyResults = await Promise.all(
               Object.entries(config.dependencies).map(
@@ -367,41 +439,56 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
                 }
               )
             );
-
             return [key, Object.fromEntries(dependencyResults)];
           }
-
           return [key, value];
         })
       );
 
-      const preparedFilters = Object.fromEntries(processedFilters);
-      const transformedFilters = transformer.transformInput(preparedFilters);
+      const finalFilters = Object.fromEntries(processedFilters);
 
-      // Fetch data with retry
+      // Fetch with retry logic
       const result = await withRetry(async () => {
-        const rawData = await fetch(transformedFilters);
-        return transformer.transformOutput(rawData);
+        const data = await fetch(finalFilters);
+        return options.transform?.output
+          ? options.transform.output(data)
+          : data;
       }, retryConfig);
 
       // Update cache and state
       cache.current.set(cacheKey, {
         data: result,
-        source: filterSource,
         timestamp: Date.now(),
+        source: filterSource,
       });
 
       setData(result);
       setFetchState(prev => ({
+        ...prev,
         isInitialFetch: false,
         lastFetchedAt: Date.now(),
+        missingRequiredFilters: [],
       }));
     } catch (err) {
       setError(err as Error);
+      setFetchState(prev => ({
+        ...prev,
+        isInitialFetch: false,
+      }));
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [
+    filters,
+    memoizedFetchOptions,
+    filterSource,
+    cacheTimeout,
+    fConfig,
+    fetch,
+    options.transform,
+    retryConfig,
+    validateRequiredFilters,
+  ]);
 
   const debouncedFetch = useMemo(
     () => debounce(fetchFilteredData, fetchOptions.debounceTime),
@@ -478,6 +565,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     reset,
     refetch: fetchFilteredData,
     fetchState,
+    validateRequiredFilters,
     exportFilters,
     importFilters,
     storage: {
