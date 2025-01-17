@@ -187,6 +187,27 @@ export type FilterValues<T extends FilterConfig[]> = {
   [P in ExtractKeys<T[number]>]: FilterOutput<GetConfigForKey<T, P>>;
 };
 
+export interface FetchConfig {
+  /**
+   * Dependencies array that will trigger a fetch when changed
+   */
+  dependencies?: any[];
+  /**
+   * Debounce time in milliseconds for fetch requests
+   * @default 300
+   */
+  debounceTime?: number;
+  /**
+   * Default filters to use when resetting
+   */
+  defaultValues?: Record<string, any>;
+  /**
+   * Whether to fetch data when filters are empty
+   * @default false
+   */
+  fetchOnEmpty?: boolean;
+}
+
 export interface UseFilterizeProps<TConfig extends FilterConfig[]> {
   config: TConfig;
   fetch: (filters: Partial<FilterValues<TConfig>>) => Promise<any>;
@@ -199,6 +220,10 @@ export interface UseFilterizeProps<TConfig extends FilterConfig[]> {
     storage?: StorageConfig;
     retry?: RetryConfig;
     transform?: TransformConfig;
+    /**
+     * Configuration for fetch behavior
+     */
+    fetch?: FetchConfig;
   };
 }
 
@@ -221,6 +246,7 @@ export interface FilterHistoryState<T> {
   filters: T;
   timestamp: number;
 }
+
 export interface UseFilterizeReturn<TConfig extends FilterConfig[]> {
   filters: Partial<FilterValues<TConfig>>;
   updateFilter: <K extends keyof FilterValues<TConfig>>(
@@ -235,10 +261,16 @@ export interface UseFilterizeReturn<TConfig extends FilterConfig[]> {
     filters: string;
   };
   importFilters: (data: { filters: string; groups?: string[] }) => void;
-  fetch: () => Promise<void>;
+  /**
+   * Manually trigger a fetch with current filters
+   */
+  refetch: () => Promise<void>;
   storage: {
     clear: () => Promise<void>;
   };
+  /**
+   * Reset filters to default values and clear storage
+   */
   reset: () => void;
   history: {
     undo: () => void;
@@ -248,6 +280,13 @@ export interface UseFilterizeReturn<TConfig extends FilterConfig[]> {
     current: FilterHistoryState<Partial<FilterValues<TConfig>>>;
     past: FilterHistoryState<Partial<FilterValues<TConfig>>>[];
     future: FilterHistoryState<Partial<FilterValues<TConfig>>>[];
+  };
+  /**
+   * Current state of the fetch operation
+   */
+  fetchState: {
+    isInitialFetch: boolean;
+    lastFetchedAt: number | null;
   };
 }
 

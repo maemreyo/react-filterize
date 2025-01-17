@@ -1,3 +1,4 @@
+import debounce from 'lodash/debounce';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   serializeFilters,
@@ -38,6 +39,13 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       cacheTimeout: 5 * 60 * 1000,
       autoFetch: true,
       ...options,
+      fetch: {
+        debounceTime: 300,
+        fetchOnEmpty: false,
+        defaultValues: {},
+        dependencies: [],
+        ...options.fetch,
+      },
     }),
     [options]
   );
@@ -49,6 +57,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     storage,
     cacheTimeout,
     autoFetch,
+    fetch: fetchOptions,
   } = memoizedOptions;
 
   const retryConfig = useMemo<RetryConfig>(
@@ -69,6 +78,10 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     [options.transform]
   );
   const [filterSource, setFilterSource] = useState<FilterSource>('none');
+  const [fetchState, setFetchState] = useState({
+    isInitialFetch: true,
+    lastFetchedAt: null as number | null,
+  });
   const storageManager = useMemo(() => new StorageManager(storage), [storage]);
 
   // Helper function to deserialize URL filters
@@ -136,10 +149,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     (newFilters: Partial<FilterValues<TConfig>>) => {
       if (syncUrl) {
         const urlParams = new URLSearchParams(window.location.search);
-        urlParams.set(
-          urlKey,
-          serializeFilters(newFilters, encode)
-        );
+        urlParams.set(urlKey, serializeFilters(newFilters, encode));
         const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
         window.history.pushState({}, '', newUrl);
       }
@@ -191,18 +201,6 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     loadStoredData();
   }, []);
 
-  // // Save state to storage when filters change
-  // useEffect(() => {
-  //   const saveData = async () => {
-  //     await storageManager.save({
-  //       filters,
-  //       timestamp: Date.now(),
-  //     });
-  //   };
-
-  //   saveData();
-  // }, [filters, storageManager]);
-
   // Cache management with useRef
   const cache = useRef<
     Map<
@@ -243,13 +241,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       window.addEventListener('popstate', handleUrlChange);
       return () => window.removeEventListener('popstate', handleUrlChange);
     }
-  }, [
-    syncUrl,
-    urlKey,
-    encode,
-    memoizedFiltersConfig,
-    storage,
-  ]);
+  }, [syncUrl, urlKey, encode, memoizedFiltersConfig, storage]);
 
   // Storage synchronization
   useEffect(() => {
@@ -283,10 +275,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
         // Update URL if enabled
         if (syncUrl) {
           const urlParams = new URLSearchParams(window.location.search);
-          urlParams.set(
-            urlKey,
-            serializeFilters(newFilters, encode)
-          );
+          urlParams.set(urlKey, serializeFilters(newFilters, encode));
           const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
           window.history.pushState({}, '', newUrl);
           setFilterSource('url');
@@ -309,6 +298,16 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       const activeFilters = {
         ...filters,
       };
+
+      const shouldSkipFetch =
+        !fetchOptions.fetchOnEmpty &&
+        Object.keys(activeFilters).length === 0 &&
+        !fetchOptions.defaultValues;
+
+      if (shouldSkipFetch) {
+        return;
+      }
+
       const cacheKey = JSON.stringify(activeFilters);
 
       // Check cache
@@ -355,7 +354,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
         return transformer.transformOutput(rawData);
       }, retryConfig);
 
-      // Update cache
+      // Update cache and state
       cache.current.set(cacheKey, {
         data: result,
         source: filterSource,
@@ -363,19 +362,30 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       });
 
       setData(result);
+      setFetchState(prev => ({
+        isInitialFetch: false,
+        lastFetchedAt: Date.now(),
+      }));
     } catch (err) {
       setError(err as Error);
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [
+    filters,
+  ]);
+
+  const debouncedFetch = useMemo(
+    () => debounce(fetchFilteredData, fetchOptions.debounceTime),
+    [fetchFilteredData, fetchOptions.debounceTime]
+  );
 
   // Auto-fetch effect
   useEffect(() => {
     if (autoFetch) {
-      fetchFilteredData();
+      debouncedFetch();
     }
-  }, [autoFetch, fetchFilteredData]);
+  }, [...(fetchOptions.dependencies || []), filters, autoFetch]);
 
   // Memoize export/import functions
   const exportFilters = useCallback(
@@ -406,7 +416,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
   }, [storageManager, syncUrl]);
 
   const reset = useCallback(() => {
-    setFilters({});
+    setFilters((fetchOptions.defaultValues as any) || ({} as any));
     setFilterSource('default');
 
     if (syncUrl) {
@@ -417,7 +427,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     }
 
     clearStorage();
-  }, [clearStorage, syncUrl, urlKey]);
+  }, [fetchOptions, clearStorage, syncUrl, urlKey]);
 
   return {
     filters,
@@ -426,13 +436,14 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     error,
     data,
     filterSource,
+    reset,
+    refetch: fetchFilteredData,
+    fetchState,
     exportFilters,
     importFilters,
-    fetch: fetchFilteredData,
     storage: {
       clear: clearStorage,
     },
-    reset,
     history: {
       undo,
       redo,

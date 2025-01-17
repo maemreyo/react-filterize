@@ -3,11 +3,7 @@ import styled from 'styled-components';
 import Filters from './Filters';
 import ProductsGrid from './ProductGrid';
 import { dummyData } from './data';
-import {
-  useFilterize,
-  addFilter,
-  ValueTypes,
-} from '@matthew.ngo/react-filterize';
+import { useFilterize, addFilter } from '@matthew.ngo/react-filterize';
 
 const Container = styled.div`
   padding: 20px;
@@ -94,7 +90,8 @@ const ProductControl: React.FC = () => {
     error,
     data: products,
     filterSource,
-    fetch: refetch,
+    refetch,
+    reset,
   } = useFilterize({
     config,
     fetch,
@@ -102,6 +99,12 @@ const ProductControl: React.FC = () => {
       syncUrl: true,
       urlKey: 'pf',
       autoFetch: true,
+      fetch: {
+        fetchOnEmpty: true,
+        defaultValues: {
+          search: 'hello',
+        },
+      },
     },
   });
 
@@ -122,6 +125,7 @@ const ProductControl: React.FC = () => {
 
       <Filters filters={filters} setFilters={handleFilterChange} />
       <button onClick={refetch}>Refetch</button>
+      <button onClick={reset}>Reset</button>
       <Error isHidden={!error}>
         {error?.message || 'An error occurred while fetching the data.'}
       </Error>
