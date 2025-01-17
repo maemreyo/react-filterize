@@ -177,8 +177,9 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       setFilters(prev => {
         const newFilters = {
           ...prev,
-          [key]: value,
-        };
+          // Fix: Cast the key to string to satisfy TypeScript
+          [key as string]: value,
+        } as Partial<FilterValues<TConfig>>;
 
         updateHistoryForFilters(newFilters);
 

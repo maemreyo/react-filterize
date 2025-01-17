@@ -44,7 +44,7 @@ function isFileArray(value: any): value is File[] {
 
 export const validateFilters = async <TConfig extends FilterConfig[]>(
   filters: Partial<FilterValues<TConfig>>,
-  configs: [...TConfig]
+  configs: TConfig
 ): Promise<boolean> => {
   try {
     const validationResults = await Promise.all(

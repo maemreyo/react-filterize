@@ -1,14 +1,16 @@
 import { useState, useCallback } from 'react';
 import { FilterHistory, FilterHistoryState } from '../types';
 
-export const useFilterHistory = (initialState: FilterHistoryState) => {
-  const [history, setHistory] = useState<FilterHistory>({
+export const useFilterHistory = <T extends Record<string, any>>(
+  initialState: FilterHistoryState<T>
+) => {
+  const [history, setHistory] = useState<FilterHistory<T>>({
     past: [],
     present: initialState,
     future: [],
   });
 
-  const push = useCallback((newState: FilterHistoryState) => {
+  const push = useCallback((newState: FilterHistoryState<T>) => {
     setHistory(curr => ({
       past: [...curr.past, curr.present],
       present: newState,

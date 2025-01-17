@@ -77,10 +77,12 @@ export interface FilterConfigWithType<T extends ValueTypeKey>
   extends BaseFilterConfig {
   type: T;
   defaultValue?: OutputValueType[T];
-  dependencies?: Record<string, (value: OutputValueType[T]) => any>;
+  dependencies?: Record<
+    string,
+    (value: OutputValueType[T]) => Promise<any> | any
+  >;
   transform?: (value: OutputValueType[T]) => any;
 }
-
 
 export interface FilterConfigWithoutType<T extends DefaultValue>
   extends BaseFilterConfig {
@@ -92,7 +94,6 @@ export interface FilterConfigWithoutType<T extends DefaultValue>
   >;
   transform?: (value: T extends null | undefined ? any : T) => any;
 }
-
 
 export type FilterConfig<T = any> =
   | FilterConfigWithType<ValueTypeKey>
@@ -123,7 +124,7 @@ function inferValueTypeFromValue(value: DefaultValue): ValueTypeKey {
     if (isDateArray(value)) return ValueTypes.DATE_ARRAY;
     if (isNumberArray(value)) return ValueTypes.NUMBER_ARRAY;
     if (isFileArray(value)) return ValueTypes.FILE_ARRAY;
-    return ValueTypes.STRING_ARRAY; 
+    return ValueTypes.STRING_ARRAY;
   }
 
   if (typeof value === 'string') return ValueTypes.STRING;
@@ -149,7 +150,6 @@ export function createFilterConfig<
   } as FilterConfig;
 }
 
-
 export type FilterHook<T extends ValueTypeKey> = {
   value: OutputValueType[T];
   setValue: (value: OutputValueType[T]) => void;
@@ -166,18 +166,30 @@ export interface FilterGroup {
 
 export type ExtractFilterValue<T> = T extends FilterConfig<infer V> ? V : never;
 
-export type FilterOutput<T extends FilterConfig> = T extends FilterConfigWithType<infer Type>
+export type FilterOutput<
+  T extends FilterConfig
+> = T extends FilterConfigWithType<infer Type>
   ? OutputValueType[Type]
   : T extends FilterConfigWithoutType<infer Value>
   ? Value
   : never;
 
+// Helper type to extract keys from config array
+type ExtractKeys<T> = T extends FilterConfig ? T['key'] : never;
+
+// Helper type to get the config type for a specific key
+type GetConfigForKey<T extends FilterConfig[], K extends string> = Extract<
+  T[number],
+  { key: K }
+>;
+
+// Fixed FilterValues type
 export type FilterValues<T extends FilterConfig[]> = {
-  [K in T[number] as K['key']]: FilterOutput<K>;
+  [P in ExtractKeys<T[number]>]: FilterOutput<GetConfigForKey<T, P>>;
 };
 
 export interface UseFilterizeProps<TConfig extends FilterConfig[]> {
-  filtersConfig: [...TConfig];
+  filtersConfig: TConfig;
   fetchData: (filters: Partial<FilterValues<TConfig>>) => Promise<any>;
   options?: {
     syncWithUrl?: boolean;
@@ -244,10 +256,7 @@ export interface UseFilterizeReturn<TConfig extends FilterConfig[]> {
   exportFilters: () => {
     filters: string;
   };
-  importFilters: (data: { 
-    filters: string; 
-    groups?: string[];
-  }) => void;
+  importFilters: (data: { filters: string; groups?: string[] }) => void;
   analytics: {
     filterUsage: Record<keyof FilterValues<TConfig>, FilterUsageMetrics>;
     combinations: Record<string, number>;
@@ -272,7 +281,6 @@ export interface UseFilterizeReturn<TConfig extends FilterConfig[]> {
     future: FilterHistoryState<Partial<FilterValues<TConfig>>>[];
   };
 }
-
 
 export interface RetryConfig {
   attempts: number;
