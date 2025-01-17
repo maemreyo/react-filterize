@@ -51,19 +51,16 @@ const ProductControl: React.FC = () => {
     createFilterConfig({
       key: 'minPrice',
       label: 'Min Price',
-      type: ValueTypes.NUMBER,
       defaultValue: 0,
     }),
     createFilterConfig({
       key: 'maxPrice',
       label: 'Max Price',
-      type: ValueTypes.NUMBER,
       defaultValue: 0,
     }),
     createFilterConfig({
       key: 'rating',
       label: 'Min Rating',
-      type: ValueTypes.NUMBER,
       defaultValue: 0,
     }),
   ];
@@ -122,7 +119,7 @@ const ProductControl: React.FC = () => {
 
   return (
     <Container>
-      <Filters setFilters={handleFilterChange} />
+      <Filters filters={filters} setFilters={handleFilterChange} />
       <Error isHidden={!error}>
         {error?.message || 'An error occurred while fetching the data.'}
       </Error>

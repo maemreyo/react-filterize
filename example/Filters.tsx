@@ -40,12 +40,13 @@ const Select = styled.select`
 `;
 
 interface FiltersProps {
+  filters: any;
   setFilters: (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => void;
 }
 
-const Filters: React.FC<FiltersProps> = ({ setFilters }) => {
+const Filters: React.FC<FiltersProps> = ({ filters, setFilters }) => {
   return (
     <FiltersContainer>
       <FiltersGrid>
@@ -57,13 +58,14 @@ const Filters: React.FC<FiltersProps> = ({ setFilters }) => {
             name="search"
             placeholder="Search products..."
             autoComplete="off"
+            defaultValue={filters.search}
             onChange={setFilters}
           />
         </FilterItem>
 
         <FilterItem>
           <Label htmlFor="status">Status</Label>
-          <Select id="status" name="status" onChange={setFilters}>
+          <Select id="status" name="status" defaultValue={filters.status} onChange={setFilters}>
             <option value="">All</option>
             <option value="true">Active</option>
             <option value="false">Inactive</option>
@@ -77,7 +79,9 @@ const Filters: React.FC<FiltersProps> = ({ setFilters }) => {
             id="minPrice"
             name="minPrice"
             placeholder="Min price"
+            defaultValue={filters.minPrice}
             onChange={setFilters}
+            min={0}
           />
         </FilterItem>
 
@@ -88,7 +92,9 @@ const Filters: React.FC<FiltersProps> = ({ setFilters }) => {
             id="maxPrice"
             name="maxPrice"
             placeholder="Max price"
+            defaultValue={filters.maxPrice}
             onChange={setFilters}
+            min={0}
           />
         </FilterItem>
 
@@ -102,6 +108,7 @@ const Filters: React.FC<FiltersProps> = ({ setFilters }) => {
             max="5"
             step="0.5"
             placeholder="Minimum rating"
+            defaultValue={filters.rating}
             onChange={setFilters}
           />
         </FilterItem>
