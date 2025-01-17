@@ -61,8 +61,6 @@ const ProductControl: React.FC = () => {
     }),
   ];
 
-  console.log('config', config);
-
   // Mock API function
   const fetch = async (filters: any) => {
     const delay = Math.random() * 1000 + 500;
@@ -92,7 +90,6 @@ const ProductControl: React.FC = () => {
     filterSource,
     refetch,
     reset,
-    fetchState,
   } = useFilterize({
     config,
     fetch,
@@ -103,19 +100,22 @@ const ProductControl: React.FC = () => {
       autoFetch: true,
       fetch: {
         fetchOnEmpty: true,
-        defaultValues: {
-          search: 'hello',
-        },
-        requiredFilters: ['rating'],
-        onMissingRequired: missingFilters => {
-          console.log('Missing required filters:', missingFilters);
-        },
+        // defaultValues: {
+        //   search: 'hello',
+        // },
+        // requiredFilters: ['rating'],
+        // onMissingRequired: missingFilters => {
+        //   console.log('Missing required filters:', missingFilters);
+        // },
+      },
+      storage: {
+        type: 'local',
+        include: ['search'],
       },
     },
   });
 
   console.log('filtesrs', filters);
-  console.log('fetchState', fetchState);
 
   // Handler for filter changes
   const handleFilterChange = (

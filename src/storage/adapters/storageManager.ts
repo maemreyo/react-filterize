@@ -1,88 +1,193 @@
-import {
-  StorageAdapter,
-  SyncStorageAdapter,
-  StorageConfig,
-  StorageData,
-} from '../types';
-import { LocalStorageAdapter } from './localStorageAdapter';
-import { MemoryStorageAdapter } from './memoryStorageAdapter';
-import { SessionStorageAdapter } from './sessionStorageAdapter';
+import { compress, decompress } from '../../utils/compression';
+import { StorageConfig, StorageData } from '../types';
 
 export class StorageManager {
-  private adapter: StorageAdapter | SyncStorageAdapter;
-  private serializer: StorageConfig['serializer'];
+  private config: Required<StorageConfig>;
+  private storage: Storage | null;
+  private memoryStorage: Map<string, string>;
 
-  constructor(config: StorageConfig) {
-    this.adapter = this.createAdapter(config);
-    this.serializer = config.serializer || {
-      serialize: JSON.stringify,
-      deserialize: JSON.parse,
-    };
-  }
+  private defaultConfig: Required<StorageConfig> = {
+    type: 'none',
+    key: 'filterize',
+    version: '1.0.0',
+    migrations: [],
+    include: [],
+    exclude: [],
+    compress: false,
+    serialize: JSON.stringify,
+    deserialize: JSON.parse,
+    onMigrationComplete: () => {},
+  };
 
-  private createAdapter(config: StorageConfig): StorageAdapter {
-    const prefix = config.prefix || '@filter/';
+  constructor(config: StorageConfig = {}) {
+    this.config = { ...this.defaultConfig, ...config };
+    this.memoryStorage = new Map();
 
-    switch (config.type) {
+    // Initialize storage based on type
+    switch (this.config.type) {
       case 'local':
-        return new LocalStorageAdapter(prefix);
+        this.storage = window.localStorage;
+        break;
       case 'session':
-        return new SessionStorageAdapter(prefix);
+        this.storage = window.sessionStorage;
+        break;
       case 'memory':
-        return new MemoryStorageAdapter(prefix);
-      case 'none':
+        this.storage = null; // Use memoryStorage
+        break;
       default:
-        return new MemoryStorageAdapter(prefix);
+        this.storage = null;
     }
   }
 
-  async save(data: StorageData): Promise<void> {
-    try {
-      const serialized = this.serializer?.serialize(data);
-      await this.adapter.setItem('filterData', serialized!);
-    } catch (error) {
-      console.error('Failed to save filter data:', error);
-    }
+  private async compressData(data: string): Promise<string> {
+    return this.config.compress ? await compress(data) : data;
   }
 
-  async load(): Promise<StorageData | null> {
-    try {
-      const serialized = await this.adapter.getItem('filterData');
-      if (!serialized) return null;
-
-      const data = this.serializer?.deserialize(serialized);
-      return data;
-    } catch (error) {
-      console.error('Failed to load filter data:', error);
-      return null;
-    }
+  private async decompressData(data: string): Promise<string> {
+    return this.config.compress ? await decompress(data) : data;
   }
 
-  loadSync(): StorageData | null {
-    try {
-      // Check if the adapter supports synchronous operations
-      if ('getItemSync' in this.adapter) {
-        const serialized = this.adapter.getItemSync('filterData');
-        if (!serialized) return null;
+  private filterData(data: Record<string, any>): Record<string, any> {
+    // console.log('[StorageManager] Filtering data:', data);
 
-        const data = this.serializer?.deserialize(serialized);
-        return data;
-      }
-      console.warn(
-        'Synchronous loading is not supported by the current adapter'
+    // Use empty arrays as default values
+    const { include = [], exclude = [] } = this.config;
+
+    // console.log('[StorageManager] Include:', include);
+    // console.log('[StorageManager] Exclude:', exclude);
+    // console.log('[StorageManager] Data keys:', Object.keys(data));
+
+    if (include.length > 0) {
+      return Object.fromEntries(
+        Object.entries(data.filters).filter(([key]) => include.includes(key))
       );
-      return null;
+    }
+
+    if (exclude.length > 0) {
+      return Object.fromEntries(
+        Object.entries(data.filters).filter(([key]) => !exclude.includes(key))
+      );
+    }
+
+    return data;
+  }
+
+  private async migrateData(
+    data: StorageData,
+    currentVersion: string
+  ): Promise<StorageData> {
+    if (!data.version || data.version === currentVersion) {
+      return data;
+    }
+
+    const migrations = this.config.migrations
+      .filter(m => m.fromVersion === data.version)
+      .sort((a, b) => this.compareVersions(b.fromVersion, a.fromVersion));
+
+    let migratedData = { ...data };
+
+    for (const migration of migrations) {
+      migratedData = await migration.transform(
+        migratedData,
+        migration.fromVersion
+      );
+    }
+
+    migratedData.version = currentVersion;
+
+    this.config.onMigrationComplete?.(
+      data.version,
+      currentVersion,
+      migratedData
+    );
+
+    return migratedData;
+  }
+
+  private compareVersions(a: string, b: string): number {
+    const partsA = a.split('.').map(Number);
+    const partsB = b.split('.').map(Number);
+
+    for (let i = 0; i < 3; i++) {
+      if (partsA[i] > partsB[i]) return 1;
+      if (partsA[i] < partsB[i]) return -1;
+    }
+
+    return 0;
+  }
+
+  public async save(data: Omit<StorageData, 'version'>): Promise<void> {
+    if (this.config.type === 'none') return;
+
+    const filteredData = this.filterData(data);
+    // console.log('[StorageManager] Saving data:', filteredData);
+    const storageData: StorageData = {
+      filters: { ...filteredData },
+      version: this.config.version,
+      timestamp: Date.now(),
+    };
+
+    const serialized = this.config.serialize(storageData);
+    const compressed = await this.compressData(serialized);
+
+    if (this.storage) {
+      this.storage.setItem(this.config.key, compressed);
+    } else {
+      this.memoryStorage.set(this.config.key, compressed);
+    }
+  }
+
+  public async load(): Promise<StorageData | null> {
+    if (this.config.type === 'none') return null;
+
+    const compressed = this.storage
+      ? this.storage.getItem(this.config.key)
+      : this.memoryStorage.get(this.config.key);
+
+    if (!compressed) return null;
+
+    try {
+      const decompressed = await this.decompressData(compressed);
+      const data = this.config.deserialize(decompressed) as StorageData;
+
+      return await this.migrateData(data, this.config.version);
     } catch (error) {
-      console.error('Failed to load filter data synchronously:', error);
+      console.error('Error loading storage:', error);
       return null;
     }
   }
 
-  async clear(): Promise<void> {
+  public loadSync(): StorageData | null {
+    if (this.config.type === 'none') return null;
+
+    const compressed = this.storage
+      ? this.storage.getItem(this.config.key)
+      : this.memoryStorage.get(this.config.key);
+
+    if (!compressed) return null;
+
     try {
-      await this.adapter.clear();
-    } catch (error) {
-      console.error('Failed to clear filter data:', error);
+      const data = this.config.deserialize(compressed) as StorageData;
+      // Note: Sync load doesn't support compression or migration
+      return data;
+    } catch {
+      return null;
+    }
+  }
+
+  public async clear(): Promise<void> {
+    if (this.storage) {
+      this.storage.removeItem(this.config.key);
+    } else {
+      this.memoryStorage.delete(this.config.key);
+    }
+  }
+
+  public async clearAll(): Promise<void> {
+    if (this.storage) {
+      this.storage.clear();
+    } else {
+      this.memoryStorage.clear();
     }
   }
 }
