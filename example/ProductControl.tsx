@@ -57,11 +57,13 @@ const ProductControl: React.FC = () => {
     createFilterConfig({
       key: 'maxPrice',
       label: 'Max Price',
+      type: ValueTypes.NUMBER,
       defaultValue: 0,
     }),
     createFilterConfig({
       key: 'rating',
       label: 'Min Rating',
+      type: ValueTypes.NUMBER,
       defaultValue: 0,
     }),
   ];

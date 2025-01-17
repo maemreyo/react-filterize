@@ -1,5 +1,9 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { serializeFilters, deserializeFilters } from '../utils/serialization';
+import {
+  serializeFilters,
+  deserializeFilters,
+  convertInputValue,
+} from '../utils/serialization';
 import { validateFilters } from '../utils/validation';
 import {
   UseFilterizeProps,
@@ -21,13 +25,16 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
 }: UseFilterizeProps<TConfig>): UseFilterizeReturn<TConfig> => {
   console.log('[useFilterize] Initializing useFilterize hook');
 
-  // Memoize options object
+  const memoizedFiltersConfig = useMemo(() => filtersConfig, []);
+
   const memoizedOptions = useMemo(
     () => ({
       syncWithUrl: false,
       urlFiltersKey: 'filters',
       encodeUrlFilters: true,
-      storage: { type: 'none' as const },
+      storage: {
+        type: 'none' as const,
+      },
       cacheTimeout: 5 * 60 * 1000,
       autoFetch: true,
       ...options,
@@ -64,16 +71,25 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
 
   const storageManager = useMemo(() => new StorageManager(storage), [storage]);
 
+  // Helper function to deserialize URL filters
+  const deserializeUrlFilters = useCallback(
+    (encodedFilters: string | null) => {
+      if (!encodedFilters) return {};
+      return deserializeFilters(
+        encodedFilters,
+        encodeUrlFilters,
+        memoizedFiltersConfig
+      ) as Partial<FilterValues<TConfig>>;
+    },
+    [encodeUrlFilters, memoizedFiltersConfig]
+  );
+
   // State management
   const [filters, setFilters] = useState<Partial<FilterValues<TConfig>>>(() => {
     if (syncWithUrl) {
       const urlParams = new URLSearchParams(window.location.search);
       const encodedFilters = urlParams.get(urlFiltersKey);
-      return encodedFilters
-        ? (deserializeFilters(encodedFilters, encodeUrlFilters) as Partial<
-            FilterValues<TConfig>
-          >)
-        : {};
+      return deserializeUrlFilters(encodedFilters);
     }
     return {};
   });
@@ -173,21 +189,37 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
   }, [filters, storageManager]);
 
   // Cache management with useRef
-  const cache = useRef<Map<string, { data: any; timestamp: number }>>(
-    new Map()
-  );
+  const cache = useRef<
+    Map<
+      string,
+      {
+        data: any;
+        timestamp: number;
+      }
+    >
+  >(new Map());
 
   // URL synchronization
   useEffect(() => {
     if (syncWithUrl) {
-      const urlParams = new URLSearchParams(window.location.search);
-      const encodedFilters = urlParams.get(urlFiltersKey);
-      const urlFilters = encodedFilters
-        ? deserializeFilters(encodedFilters, encodeUrlFilters)
-        : {};
-      setFilters(urlFilters as Partial<FilterValues<TConfig>>);
+      const handleUrlChange = () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const encodedFilters = urlParams.get(urlFiltersKey);
+        const urlFilters = deserializeUrlFilters(encodedFilters);
+        setFilters(urlFilters);
+      };
+
+      // Handle initial URL state
+      handleUrlChange();
+
+      // Listen for popstate events (browser back/forward)
+      window.addEventListener('popstate', handleUrlChange);
+
+      return () => {
+        window.removeEventListener('popstate', handleUrlChange);
+      };
     }
-  }, [syncWithUrl, urlFiltersKey, encodeUrlFilters]);
+  }, [syncWithUrl, urlFiltersKey, deserializeUrlFilters]);
 
   // Memoize update filter function
   const updateFilter = useCallback(
@@ -195,16 +227,30 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       key: K,
       value: FilterValues<TConfig>[K]
     ) => {
+      const config = memoizedFiltersConfig.find(c => c.key === key);
+      const convertedValue = convertInputValue(value, config?.type);
+
       setFilters(prev => {
         const newFilters = {
           ...prev,
-          [key as string]: value,
+          [key]: convertedValue,
         } as Partial<FilterValues<TConfig>>;
-        updateHistoryForFilters(newFilters);
+
+        // Update URL if needed
+        if (syncWithUrl) {
+          const urlParams = new URLSearchParams(window.location.search);
+          urlParams.set(
+            urlFiltersKey,
+            serializeFilters(newFilters, encodeUrlFilters)
+          );
+          const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
+          window.history.pushState({}, '', newUrl);
+        }
+
         return newFilters;
       });
     },
-    [syncWithUrl, urlFiltersKey, encodeUrlFilters, updateHistoryForFilters]
+    [memoizedFiltersConfig, syncWithUrl, urlFiltersKey, encodeUrlFilters]
   );
 
   // Memoize fetch function
@@ -213,7 +259,9 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       setLoading(true);
       setError(null);
 
-      const activeFilters = { ...filters };
+      const activeFilters = {
+        ...filters,
+      };
       const cacheKey = JSON.stringify(activeFilters);
 
       // Check cache
@@ -293,11 +341,12 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     (data: { filters: string; groups?: string[] }) => {
       const importedFilters = deserializeFilters(
         data.filters,
-        encodeUrlFilters
+        encodeUrlFilters,
+        memoizedFiltersConfig
       );
       setFilters(importedFilters as Partial<FilterValues<TConfig>>);
     },
-    [encodeUrlFilters]
+    [encodeUrlFilters, memoizedFiltersConfig]
   );
 
   const clearStorage = useCallback(async () => {

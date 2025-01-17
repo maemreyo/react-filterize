@@ -1,3 +1,57 @@
+import { ValueTypes, FilterConfig } from '../types';
+
+// Helper function to convert value based on type
+const convertValueByType = (value: any, type?: string) => {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  switch (type) {
+    case ValueTypes.NUMBER:
+      return Number(value);
+    case ValueTypes.BOOLEAN:
+      return value === 'true';
+    case ValueTypes.DATE:
+      return new Date(value);
+    case ValueTypes.NUMBER_ARRAY:
+      return Array.isArray(value) ? value.map(v => Number(v)) : value;
+    case ValueTypes.DATE_ARRAY:
+      return Array.isArray(value) ? value.map(v => new Date(v)) : value;
+    case ValueTypes.STRING:
+    case ValueTypes.STRING_ARRAY:
+    default:
+      return value;
+  }
+};
+
+export const convertInputValue = (value: any, type?: string) => {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  switch (type) {
+    case ValueTypes.NUMBER:
+      // Convert to number but handle empty string
+      return value === '' ? null : Number(value);
+    case ValueTypes.BOOLEAN:
+      return value === 'true' || value === true;
+    case ValueTypes.DATE:
+      return value instanceof Date ? value : new Date(value);
+    case ValueTypes.NUMBER_ARRAY:
+      return Array.isArray(value)
+        ? value.map(v => (v === null ? null : Number(v)))
+        : value;
+    case ValueTypes.DATE_ARRAY:
+      return Array.isArray(value)
+        ? value.map(v => (v === null ? null : new Date(v)))
+        : value;
+    case ValueTypes.STRING:
+    case ValueTypes.STRING_ARRAY:
+    default:
+      return value;
+  }
+};
+
 export const serializeFilters = (
   filters: Record<string, any>,
   encodeUrlFilters: boolean = true
@@ -18,14 +72,16 @@ export const serializeFilters = (
       {} as Record<string, any>
     );
 
-    // Encode or return filters as query string depending on encodeUrlFilters
     if (encodeUrlFilters) {
       return btoa(JSON.stringify(processedFilters));
     } else {
-      const queryString = new URLSearchParams(
-        processedFilters as Record<string, string>
-      ).toString();
-      return queryString;
+      const queryString = new URLSearchParams();
+      Object.entries(processedFilters).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          queryString.set(key, String(value));
+        }
+      });
+      return queryString.toString();
     }
   } catch (error) {
     console.error('Error serializing filters:', error);
@@ -35,10 +91,12 @@ export const serializeFilters = (
 
 export const deserializeFilters = (
   serialized: string,
-  encodeUrlFilters: boolean = true
+  encodeUrlFilters: boolean = true,
+  filtersConfig?: FilterConfig[]
 ): Record<string, any> => {
   try {
     if (!serialized) return {};
+
     let parsed: Record<string, any> = {};
 
     // Deserialize filters according to encoding setting
@@ -51,7 +109,20 @@ export const deserializeFilters = (
       });
     }
 
-    // Handle special types like Date after deserialization
+    // Convert values based on filter config types
+    if (filtersConfig) {
+      return Object.entries(parsed).reduce((acc, [key, value]) => {
+        const config = filtersConfig.find(c => c.key === key);
+        if (config) {
+          acc[key] = convertValueByType(value, config.type);
+        } else {
+          acc[key] = value;
+        }
+        return acc;
+      }, {} as Record<string, any>);
+    }
+
+    // Fallback to basic date handling if no config provided
     return Object.entries(parsed).reduce((acc, [key, value]) => {
       if (
         typeof value === 'string' &&
