@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useFilterAnalytics } from './useFilterAnalytics';
 import { serializeFilters, deserializeFilters } from '../utils/serialization';
 import { validateFilters } from '../utils/validation';
 import {
@@ -17,20 +16,33 @@ import { detectCircularDependencies } from '../utils/dependency';
 
 export const useFilterize = <TConfig extends FilterConfig[]>({
   filtersConfig,
-  fetchData,
   options = {},
+  fetchData,
 }: UseFilterizeProps<TConfig>): UseFilterizeReturn<TConfig> => {
   console.log('[useFilterize] Initializing useFilterize hook');
 
+  // Memoize options object
+  const memoizedOptions = useMemo(
+    () => ({
+      syncWithUrl: false,
+      urlFiltersKey: 'filters',
+      encodeUrlFilters: true,
+      storage: { type: 'none' as const },
+      cacheTimeout: 5 * 60 * 1000,
+      autoFetch: true,
+      ...options,
+    }),
+    [options]
+  );
+
   const {
-    syncWithUrl = false,
-    urlFiltersKey = 'filters',
-    encodeUrlFilters = true,
-    storage = { type: 'none' as const },
-    enableAnalytics = false,
-    cacheTimeout = 5 * 60 * 1000, // 5 minutes
-    autoFetch = true,
-  } = options;
+    syncWithUrl,
+    urlFiltersKey,
+    encodeUrlFilters,
+    storage,
+    cacheTimeout,
+    autoFetch,
+  } = memoizedOptions;
 
   const retryConfig = useMemo<RetryConfig>(
     () => ({
@@ -50,10 +62,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     [options.transform]
   );
 
-  // Initialize storage manager
-  const storageManager = useMemo(() => {
-    return new StorageManager(storage);
-  }, [storage]);
+  const storageManager = useMemo(() => new StorageManager(storage), [storage]);
 
   // State management
   const [filters, setFilters] = useState<Partial<FilterValues<TConfig>>>(() => {
@@ -73,7 +82,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
   const [error, setError] = useState<Error | null>(null);
   const [data, setData] = useState<any>(null);
 
-  // Initialize history management
+  // Memoize history management hooks
   const {
     history,
     push: pushHistory,
@@ -81,10 +90,31 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     redo: redoHistory,
     canUndo,
     canRedo,
-  } = useFilterHistory({
-    filters,
-    timestamp: Date.now(),
-  });
+  } = useFilterHistory(
+    useMemo(
+      () => ({
+        filters,
+        timestamp: Date.now(),
+      }),
+      [filters]
+    )
+  );
+
+  // Memoize update history function
+  const updateHistoryForFilters = useCallback(
+    (newFilters: Partial<FilterValues<TConfig>>) => {
+      if (syncWithUrl) {
+        const urlParams = new URLSearchParams(window.location.search);
+        urlParams.set(
+          urlFiltersKey,
+          serializeFilters(newFilters, encodeUrlFilters)
+        );
+        const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
+        window.history.pushState({}, '', newUrl);
+      }
+    },
+    [syncWithUrl, urlFiltersKey, encodeUrlFilters]
+  );
 
   // Update history when filters change
   useEffect(() => {
@@ -92,14 +122,14 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       filters,
       timestamp: Date.now(),
     });
-  }, [filters]);
+  }, [filters, pushHistory]);
 
-  // Check for circular dependencies on initialization
+  // Check for circular dependencies on mount only
   useEffect(() => {
     detectCircularDependencies(filtersConfig);
-  }, [filtersConfig]);
+  }, []); // Empty dependency array as this should only run once
 
-  // Modify history handling functions
+  // Memoize undo/redo functions
   const undo = useCallback(() => {
     undoHistory();
     const previousState = history.past[history.past.length - 1];
@@ -107,7 +137,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       setFilters(previousState.filters);
       updateHistoryForFilters(previousState.filters);
     }
-  }, [history.past, syncWithUrl, urlFiltersKey, encodeUrlFilters, undoHistory]);
+  }, [history.past, undoHistory, updateHistoryForFilters]);
 
   const redo = useCallback(() => {
     redoHistory();
@@ -116,15 +146,9 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       setFilters(nextState.filters);
       updateHistoryForFilters(nextState.filters);
     }
-  }, [
-    history.future,
-    syncWithUrl,
-    urlFiltersKey,
-    encodeUrlFilters,
-    redoHistory,
-  ]);
+  }, [history.future, redoHistory, updateHistoryForFilters]);
 
-  // Load initial state from storage
+  // Load initial state from storage once
   useEffect(() => {
     const loadStoredData = async () => {
       const storedData = await storageManager.load();
@@ -136,7 +160,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     loadStoredData();
   }, []);
 
-  // Save state to storage when it changes
+  // Save state to storage when filters change
   useEffect(() => {
     const saveData = async () => {
       await storageManager.save({
@@ -148,13 +172,10 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     saveData();
   }, [filters, storageManager]);
 
-  // Cache management
+  // Cache management with useRef
   const cache = useRef<Map<string, { data: any; timestamp: number }>>(
     new Map()
   );
-
-  // Analytics
-  const analytics = enableAnalytics ? useFilterAnalytics() : null;
 
   // URL synchronization
   useEffect(() => {
@@ -168,7 +189,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     }
   }, [syncWithUrl, urlFiltersKey, encodeUrlFilters]);
 
-  // Update filter change handling
+  // Memoize update filter function
   const updateFilter = useCallback(
     <K extends keyof FilterValues<TConfig>>(
       key: K,
@@ -177,19 +198,16 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       setFilters(prev => {
         const newFilters = {
           ...prev,
-          // Fix: Cast the key to string to satisfy TypeScript
           [key as string]: value,
         } as Partial<FilterValues<TConfig>>;
-
         updateHistoryForFilters(newFilters);
-
         return newFilters;
       });
     },
-    [syncWithUrl, urlFiltersKey, encodeUrlFilters]
+    [syncWithUrl, urlFiltersKey, encodeUrlFilters, updateHistoryForFilters]
   );
 
-  // Data fetching with cache
+  // Memoize fetch function
   const fetchFilteredData = useCallback(async () => {
     try {
       setLoading(true);
@@ -249,57 +267,28 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       });
 
       setData(result);
-
-      // Track analytics if enabled
-      if (enableAnalytics && analytics) {
-        analytics.trackFilterUsage(activeFilters);
-      }
     } catch (err) {
       setError(err as Error);
     } finally {
       setLoading(false);
     }
-  }, [
-    filters,
-    cacheTimeout,
-    filtersConfig,
-    transformer,
-    fetchData,
-    retryConfig,
-    enableAnalytics,
-    analytics,
-  ]);
+  }, [filters]);
 
   // Auto-fetch effect
   useEffect(() => {
     if (autoFetch) {
       fetchFilteredData();
     }
-  }, [fetchFilteredData, autoFetch]);
+  }, [autoFetch, fetchFilteredData]);
 
-  const updateHistoryForFilters = useCallback(
-    (newFilters: Partial<FilterValues<TConfig>>) => {
-      if (syncWithUrl) {
-        const urlParams = new URLSearchParams(window.location.search);
-        urlParams.set(
-          urlFiltersKey,
-          serializeFilters(newFilters, encodeUrlFilters)
-        );
-        const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
-        window.history.pushState({}, '', newUrl);
-      }
-    },
-    [syncWithUrl, urlFiltersKey, encodeUrlFilters]
+  // Memoize export/import functions
+  const exportFilters = useCallback(
+    () => ({
+      filters: serializeFilters(filters),
+    }),
+    [filters]
   );
 
-  // Export filters
-  const exportFilters = useCallback(() => {
-    return {
-      filters: serializeFilters(filters),
-    };
-  }, [filters]);
-
-  // Import filters
   const importFilters = useCallback(
     (data: { filters: string; groups?: string[] }) => {
       const importedFilters = deserializeFilters(
@@ -314,7 +303,6 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
   const clearStorage = useCallback(async () => {
     await storageManager.clear();
     setFilters({});
-
     pushHistory({
       filters: {},
       timestamp: Date.now(),
@@ -329,7 +317,6 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     data,
     exportFilters,
     importFilters,
-    analytics: enableAnalytics ? analytics : null,
     fetchData: fetchFilteredData,
     storage: {
       clear: clearStorage,

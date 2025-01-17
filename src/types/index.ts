@@ -195,7 +195,6 @@ export interface UseFilterizeProps<TConfig extends FilterConfig[]> {
     syncWithUrl?: boolean;
     urlFiltersKey?: string;
     encodeUrlFilters?: boolean;
-    enableAnalytics?: boolean;
     cacheTimeout?: number;
     autoFetch?: boolean;
     storage?: StorageConfig;
@@ -222,27 +221,6 @@ export interface FilterHistoryState<T> {
   timestamp: number;
 }
 
-export interface FilterAnalytics {
-  filterUsage: Record<string, FilterUsageMetrics>;
-  combinations: Record<string, number>;
-  performance: {
-    avgResponseTime: number;
-    totalRequests: number;
-    cacheHitRate: number;
-    totalCacheHits: number;
-  };
-}
-
-export interface UseFilterAnalyticsReturn<TConfig extends FilterConfig[]> {
-  filterUsage: Record<keyof FilterValues<TConfig>, FilterUsageMetrics>;
-  combinations: Record<string, number>;
-  performance: {
-    avgResponseTime: number;
-    totalRequests: number;
-    cacheHitRate: number;
-    totalCacheHits: number;
-  };
-}
 
 export interface UseFilterizeReturn<TConfig extends FilterConfig[]> {
   filters: Partial<FilterValues<TConfig>>;
@@ -257,16 +235,6 @@ export interface UseFilterizeReturn<TConfig extends FilterConfig[]> {
     filters: string;
   };
   importFilters: (data: { filters: string; groups?: string[] }) => void;
-  analytics: {
-    filterUsage: Record<keyof FilterValues<TConfig>, FilterUsageMetrics>;
-    combinations: Record<string, number>;
-    performance: {
-      avgResponseTime: number;
-      totalRequests: number;
-      cacheHitRate: number;
-      totalCacheHits: number;
-    };
-  } | null;
   fetchData: () => Promise<void>;
   storage: {
     clear: () => Promise<void>;

@@ -57,16 +57,16 @@ const ProductControl: React.FC = () => {
     createFilterConfig({
       key: 'maxPrice',
       label: 'Max Price',
-      type: ValueTypes.NUMBER,
       defaultValue: 0,
     }),
     createFilterConfig({
       key: 'rating',
       label: 'Min Rating',
-      type: ValueTypes.NUMBER,
       defaultValue: 0,
     }),
   ];
+
+  console.log('filtersConfig', filtersConfig);
 
   // Mock API function
   const fetchFilteredData = async (filters: any) => {
@@ -77,7 +77,7 @@ const ProductControl: React.FC = () => {
       const searchMatch =
         !filters.search || item.name.toLowerCase().includes(filters.search);
       const statusMatch =
-        !filters.status || item.status === (filters.status === true);
+        !filters.status || item.status === (filters.status === 'true');
       const priceMatch =
         (!filters.minPrice || item.price >= filters.minPrice) &&
         (!filters.maxPrice || item.price <= filters.maxPrice);
@@ -99,14 +99,16 @@ const ProductControl: React.FC = () => {
     fetchData: fetchFilteredData,
     options: {
       syncWithUrl: true,
-      storage: {
-        type: 'local',
-        prefix: 'products-',
-      },
-      enableAnalytics: true,
+      urlFiltersKey: 'pf',
+      // storage: {
+      //   type: 'local',
+      //   prefix: 'products-',
+      // },
       autoFetch: true,
     },
   });
+
+  console.log('filtesrs', filters);
 
   // Handler for filter changes
   const handleFilterChange = (
