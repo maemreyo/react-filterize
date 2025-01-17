@@ -137,8 +137,19 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     [encode, memoizedFiltersConfig]
   );
 
+  const getDefaultValues = useCallback(() => {
+    return fConfig.reduce((acc, filter) => {
+      if (filter.defaultValue !== undefined) {
+        // @ts-ignore
+        acc[filter.key] = filter.defaultValue;
+      }
+      return acc;
+    }, {} as Partial<FilterValues<TConfig>>);
+  }, [fConfig]);
+
   // State management
   const [filters, setFilters] = useState<Partial<FilterValues<TConfig>>>(() => {
+    // Check URL first if enabled
     if (urlManager) {
       const urlFilters = urlManager.getFiltersFromUrl();
       if (urlFilters) {
@@ -147,15 +158,16 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       }
     }
 
-    // Fallback to storage or defaults...
+    // Then check storage
     const storedData = storageManager.loadSync();
     if (storedData?.filters) {
       setFilterSource('storage');
       return storedData.filters as Partial<FilterValues<TConfig>>;
     }
 
+    // Finally use default values from config
     setFilterSource('default');
-    return {};
+    return getDefaultValues();
   });
 
   const [loading, setLoading] = useState(false);

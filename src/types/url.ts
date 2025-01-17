@@ -24,6 +24,12 @@ export interface UrlConfig {
   namespace?: string;
 
   /**
+   * Transform functions for specific filter keys
+   * @example { date: (value) => value.toISOString() }
+   */
+  transformers?: Record<string, (value: any) => string>;
+
+  /**
    * Custom serialization function
    * @param filters Current filter values
    * @returns Serialized string for URL
@@ -36,10 +42,4 @@ export interface UrlConfig {
    * @returns Parsed filter values
    */
   deserialize?: (query: string) => Record<string, any>;
-
-  /**
-   * Transform functions for specific filter keys
-   * @example { date: (value) => value.toISOString() }
-   */
-  transformers?: Record<string, (value: any) => string>;
 }

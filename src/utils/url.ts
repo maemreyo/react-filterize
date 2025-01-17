@@ -2,6 +2,7 @@ import { UrlConfig } from '../types/url';
 
 export class UrlManager {
   private config: Required<UrlConfig>;
+
   private defaultConfig: Required<UrlConfig> = {
     key: 'filters',
     encode: true,
@@ -39,38 +40,73 @@ export class UrlManager {
     return new URLSearchParams(window.location.search);
   }
 
+  private isEmptyObject(obj: Record<string, any>): boolean {
+    return obj && Object.keys(obj).length === 0;
+  }
+
+  private updateBrowserUrl(urlParams: URLSearchParams): void {
+    const search = urlParams.toString();
+    const newUrl = `${window.location.pathname}${search ? '?' + search : ''}${
+      window.location.hash
+    }`;
+    window.history.pushState({}, '', newUrl);
+  }
+
   public updateUrl(filters: Record<string, any>): void {
+    // Don't update URL if filters is empty
+    if (!filters || this.isEmptyObject(filters)) {
+      this.clearUrl();
+      return;
+    }
+
     const urlParams = this.getCurrentUrlParams();
     const paramKey = this.getParamKey();
 
     // Transform and serialize filters
     const transformedFilters = Object.entries(filters).reduce(
-      (acc, [key, value]) => ({
-        ...acc,
-        [key]: this.transformValue(key, value),
-      }),
+      (acc, [key, value]) => {
+        // Skip null, undefined, empty string values
+        if (value === null || value === undefined || value === '') {
+          return acc;
+        }
+        return {
+          ...acc,
+          [key]: this.transformValue(key, value),
+        };
+      },
       {}
     );
 
-    const serializedFilters = this.config.serialize(transformedFilters);
-    const encodedFilters = this.encodeValue(serializedFilters);
-
-    // Update URL params
-    if (!this.config.mergeParams) {
-      urlParams.forEach((_, key) => {
-        if (key.startsWith(this.config.namespace)) {
-          urlParams.delete(key);
-        }
-      });
+    // Don't update URL if all values were filtered out
+    if (this.isEmptyObject(transformedFilters)) {
+      this.clearUrl();
+      return;
     }
 
-    urlParams.set(paramKey, encodedFilters);
+    try {
+      const serializedFilters = this.config.serialize(transformedFilters);
+      // Don't encode if filters are empty
+      if (serializedFilters === '{}') {
+        this.clearUrl();
+        return;
+      }
 
-    // Update browser URL
-    const newUrl = `${window.location.pathname}?${urlParams.toString()}${
-      window.location.hash
-    }`;
-    window.history.pushState({}, '', newUrl);
+      const encodedFilters = this.encodeValue(serializedFilters);
+
+      // Clear existing namespace params if not merging
+      if (!this.config.mergeParams) {
+        urlParams.forEach((_, key) => {
+          if (key.startsWith(this.config.namespace)) {
+            urlParams.delete(key);
+          }
+        });
+      }
+
+      urlParams.set(paramKey, encodedFilters);
+      this.updateBrowserUrl(urlParams);
+    } catch (error) {
+      console.error('Error updating URL with filters:', error);
+    }
   }
 
   public getFiltersFromUrl(): Record<string, any> | null {
@@ -84,9 +120,13 @@ export class UrlManager {
 
     try {
       const decodedFilters = this.decodeValue(encodedFilters);
-      return this.config.deserialize(decodedFilters);
+      const parsedFilters = this.config.deserialize(decodedFilters);
+
+      // Return null if empty object
+      return this.isEmptyObject(parsedFilters) ? null : parsedFilters;
     } catch (error) {
       console.error('Error parsing filters from URL:', error);
+      this.clearUrl(); // Clear invalid URL params
       return null;
     }
   }
@@ -94,11 +134,24 @@ export class UrlManager {
   public clearUrl(): void {
     const urlParams = this.getCurrentUrlParams();
     const paramKey = this.getParamKey();
-    urlParams.delete(paramKey);
 
-    const newUrl = `${window.location.pathname}?${urlParams.toString()}${
-      window.location.hash
-    }`;
-    window.history.pushState({}, '', newUrl);
+    if (!this.config.mergeParams) {
+      // Clear all params in namespace
+      urlParams.forEach((_, key) => {
+        if (key.startsWith(this.config.namespace)) {
+          urlParams.delete(key);
+        }
+      });
+    } else {
+      // Only clear specific param
+      urlParams.delete(paramKey);
+    }
+
+    // Remove URL parameters if they're all empty
+    if (Array.from(urlParams.entries()).length === 0) {
+      this.updateBrowserUrl(new URLSearchParams());
+    } else {
+      this.updateBrowserUrl(urlParams);
+    }
   }
 }

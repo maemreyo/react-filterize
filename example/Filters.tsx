@@ -58,14 +58,19 @@ const Filters: React.FC<FiltersProps> = ({ filters, setFilters }) => {
             name="search"
             placeholder="Search products..."
             autoComplete="off"
-            defaultValue={filters.search}
+            value={filters.search ?? ''}
             onChange={setFilters}
           />
         </FilterItem>
 
         <FilterItem>
           <Label htmlFor="status">Status</Label>
-          <Select id="status" name="status" defaultValue={filters.status} onChange={setFilters}>
+          <Select
+            id="status"
+            name="status"
+            value={filters.status ?? ''}
+            onChange={setFilters}
+          >
             <option value="">All</option>
             <option value="true">Active</option>
             <option value="false">Inactive</option>
@@ -79,7 +84,7 @@ const Filters: React.FC<FiltersProps> = ({ filters, setFilters }) => {
             id="minPrice"
             name="minPrice"
             placeholder="Min price"
-            defaultValue={filters.minPrice}
+            value={filters.minPrice ?? ''}
             onChange={setFilters}
             min={0}
           />
@@ -92,7 +97,7 @@ const Filters: React.FC<FiltersProps> = ({ filters, setFilters }) => {
             id="maxPrice"
             name="maxPrice"
             placeholder="Max price"
-            defaultValue={filters.maxPrice}
+            value={filters.maxPrice ?? ''}
             onChange={setFilters}
             min={0}
           />
@@ -108,7 +113,7 @@ const Filters: React.FC<FiltersProps> = ({ filters, setFilters }) => {
             max="5"
             step="0.5"
             placeholder="Minimum rating"
-            defaultValue={filters.rating}
+            value={filters.rating ?? ''}
             onChange={setFilters}
           />
         </FilterItem>

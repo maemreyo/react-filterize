@@ -35,7 +35,7 @@ const ProductControl: React.FC = () => {
     addFilter({
       key: 'search',
       label: 'Search',
-      defaultValue: '',
+      defaultValue: 'aaa',
       transform: (value: string) => value.toLowerCase(),
     }),
     addFilter({
@@ -94,15 +94,13 @@ const ProductControl: React.FC = () => {
     config,
     fetch,
     options: {
-      url: {
-        key: 'search',
-      },
+      url: true,
       autoFetch: true,
       fetch: {
         fetchOnEmpty: true,
-        // defaultValues: {
-        //   search: 'hello',
-        // },
+        defaultValues: {
+          search: 'laptop',
+        },
         // requiredFilters: ['rating'],
         // onMissingRequired: missingFilters => {
         //   console.log('Missing required filters:', missingFilters);
@@ -116,7 +114,7 @@ const ProductControl: React.FC = () => {
   });
 
   console.log('filtesrs', filters);
-
+  console.log('products', products);
   // Handler for filter changes
   const handleFilterChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
