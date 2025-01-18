@@ -1,6 +1,7 @@
 import { StorageConfig } from '../storage/types';
 import { FetchConfig } from '../utils/fetch';
 import { FetchState } from '../utils/state';
+import { inferValueTypeFromValue } from '../utils/typing';
 import { UrlConfig } from './url';
 
 export const ValueTypes = {
@@ -28,8 +29,57 @@ export interface OutputValueType {
 }
 
 export type ValueTypeKey = typeof ValueTypes[keyof typeof ValueTypes];
+export type NullableArray<T> = Array<T | null> | null | undefined;
+export type Nullable<T> = T | null | undefined;
 
-type NullableArray<T> = Array<T | null> | null | undefined;
+export type DefaultValue =
+  | string
+  | number
+  | boolean
+  | Date
+  | File
+  | NullableArray<string>
+  | NullableArray<number>
+  | NullableArray<Date>
+  | NullableArray<File>
+  | null
+  | undefined;
+
+// Filter Config Types
+export interface BaseFilterConfig {
+  key: string;
+  label?: string;
+  description?: string;
+  required?: boolean;
+  hidden?: boolean;
+  disabled?: boolean;
+}
+
+export interface FilterConfigWithType<T extends ValueTypeKey>
+  extends BaseFilterConfig {
+  type: T;
+  defaultValue?: OutputValueType[T];
+  dependencies?: Record<
+    string,
+    (value: OutputValueType[T]) => Promise<any> | any
+  >;
+  transform?: (value: OutputValueType[T]) => any;
+}
+
+export interface FilterConfigWithDefaultValue<T extends DefaultValue>
+  extends BaseFilterConfig {
+  defaultValue: T;
+  type?: InferValueType<NonNullable<T>>;
+  dependencies?: Record<
+    string,
+    (value: T extends null | undefined ? any : T) => any
+  >;
+  transform?: (value: T extends null | undefined ? any : T) => any;
+}
+
+export type FilterConfig<T = any> =
+  | FilterConfigWithType<ValueTypeKey>
+  | FilterConfigWithDefaultValue<DefaultValue>;
 
 type InferValueType<T> = T extends string
   ? typeof ValueTypes.STRING
@@ -51,60 +101,38 @@ type InferValueType<T> = T extends string
   ? typeof ValueTypes.FILE_ARRAY
   : never;
 
-type Nullable<T> = T | null | undefined;
+export type ExtractKeys<T> = T extends FilterConfig ? T['key'] : never;
+export type GetConfigForKey<
+  T extends FilterConfig[],
+  K extends string
+> = Extract<T[number], { key: K }>;
+export type FilterValues<T extends FilterConfig[]> = {
+  [P in ExtractKeys<T[number]>]: FilterOutput<GetConfigForKey<T, P>>;
+};
 
-type DefaultValue =
-  | string
-  | number
-  | boolean
-  | Date
-  | File
-  | NullableArray<string>
-  | NullableArray<number>
-  | NullableArray<Date>
-  | NullableArray<File>
-  | null
-  | undefined;
-
-export interface BaseFilterConfig {
-  key: string;
-  label?: string;
-  description?: string;
-  required?: boolean;
-  hidden?: boolean;
-  disabled?: boolean;
+export interface DefaultValuesConfig {
+  initialValues?: Record<string, any>;
+  resetValues?: Record<string, any>;
+  onReset?: () => Record<string, any>;
 }
 
-// Interface cho config với explicit type
-export interface FilterConfigWithType<T extends ValueTypeKey>
-  extends BaseFilterConfig {
-  type: T;
-  defaultValue?: OutputValueType[T];
-  dependencies?: Record<
-    string,
-    (value: OutputValueType[T]) => Promise<any> | any
-  >;
-  transform?: (value: OutputValueType[T]) => any;
+export interface UseFilterizeOptions<TConfig extends FilterConfig[]> {
+  url?: UrlConfig | boolean;
+  storage?: StorageConfig;
+  cacheTimeout?: number;
+  autoFetch?: boolean;
+  retry?: RetryConfig;
+  transform?: TransformConfig;
+  fetch?: FetchConfig;
+  defaults?: DefaultValuesConfig;
 }
 
-// Interface cho config với implicit type từ defaultValue
-export interface FilterConfigWithDefaultValue<T extends DefaultValue>
-  extends BaseFilterConfig {
-  defaultValue: T;
-  type?: InferValueType<NonNullable<T>>;
-  dependencies?: Record<
-    string,
-    (value: T extends null | undefined ? any : T) => any
-  >;
-  transform?: (value: T extends null | undefined ? any : T) => any;
+export interface UseFilterizeProps<TConfig extends FilterConfig[]> {
+  config: TConfig;
+  fetch: (filters: Partial<FilterValues<TConfig>>) => Promise<any>;
+  options?: UseFilterizeOptions<TConfig>;
 }
 
-// Union type cho FilterConfig
-export type FilterConfig<T = any> =
-  | FilterConfigWithType<ValueTypeKey>
-  | FilterConfigWithDefaultValue<DefaultValue>;
-
-// Helper function để tạo filter config
 export function addFilter<T extends ValueTypeKey>(
   config: FilterConfigWithType<T>
 ): FilterConfig;
@@ -125,48 +153,12 @@ export function addFilter(config: any): FilterConfig {
   } as FilterConfigWithDefaultValue<DefaultValue>;
 }
 
-function isStringArray(arr: unknown[]): arr is (string | null)[] {
-  return arr.some(item => item !== null && typeof item === 'string');
-}
-
-function isNumberArray(arr: unknown[]): arr is (number | null)[] {
-  return arr.some(item => item !== null && typeof item === 'number');
-}
-
-function isDateArray(arr: unknown[]): arr is (Date | null)[] {
-  return arr.some(item => item !== null && item instanceof Date);
-}
-
-function isFileArray(arr: unknown[]): arr is (File | null)[] {
-  return arr.some(item => item !== null && item instanceof File);
-}
-
-function inferValueTypeFromValue(value: DefaultValue): ValueTypeKey {
-  if (value === null || value === undefined) {
-    return ValueTypes.STRING;
-  }
-
-  if (Array.isArray(value)) {
-    if (isDateArray(value)) return ValueTypes.DATE_ARRAY;
-    if (isNumberArray(value)) return ValueTypes.NUMBER_ARRAY;
-    if (isFileArray(value)) return ValueTypes.FILE_ARRAY;
-    return ValueTypes.STRING_ARRAY;
-  }
-
-  if (typeof value === 'string') return ValueTypes.STRING;
-  if (typeof value === 'number') return ValueTypes.NUMBER;
-  if (typeof value === 'boolean') return ValueTypes.BOOLEAN;
-  if (value instanceof Date) return ValueTypes.DATE;
-  if (value instanceof File) return ValueTypes.FILE;
-
-  return ValueTypes.STRING;
-}
-
 export type FilterHook<T extends ValueTypeKey> = {
   value: OutputValueType[T];
   setValue: (value: OutputValueType[T]) => void;
   clear: () => void;
 };
+
 export interface FilterGroup {
   key: string;
   label: string;
@@ -184,44 +176,6 @@ export type FilterOutput<
   : T extends FilterConfigWithDefaultValue<infer Value>
   ? Value
   : never;
-
-// Helper type to extract keys from config array
-type ExtractKeys<T> = T extends FilterConfig ? T['key'] : never;
-
-// Helper type to get the config type for a specific key
-type GetConfigForKey<T extends FilterConfig[], K extends string> = Extract<
-  T[number],
-  { key: K }
->;
-
-// Fixed FilterValues type
-export type FilterValues<T extends FilterConfig[]> = {
-  [P in ExtractKeys<T[number]>]: FilterOutput<GetConfigForKey<T, P>>;
-};
-
-export interface DefaultValuesConfig {
-  // Giá trị mặc định khi khởi tạo
-  initialValues?: Record<string, any>;
-  // Giá trị khi reset
-  resetValues?: Record<string, any>;
-  // Handler để override logic reset mặc định
-  onReset?: () => Record<string, any>;
-}
-
-export interface UseFilterizeProps<TConfig extends FilterConfig[]> {
-  config: TConfig;
-  fetch: (filters: Partial<FilterValues<TConfig>>) => Promise<any>;
-  options?: {
-    url?: UrlConfig | boolean;
-    storage?: StorageConfig;
-    cacheTimeout?: number;
-    autoFetch?: boolean;
-    retry?: RetryConfig;
-    transform?: TransformConfig;
-    fetch?: FetchConfig;
-    defaults?: DefaultValuesConfig;
-  };
-}
 
 export type FilterSource = 'url' | 'storage' | 'default' | 'none';
 
