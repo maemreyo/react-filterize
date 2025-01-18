@@ -60,6 +60,7 @@ const ProductControl: React.FC = () => {
 
   // Mock API function
   const fetch = async (filters: any) => {
+    console.log('[fetch] Received filters:', filters);
     const delay = Math.random() * 1000 + 500;
     await new Promise(resolve => setTimeout(resolve, delay));
 
@@ -94,16 +95,9 @@ const ProductControl: React.FC = () => {
       url: true,
       autoFetch: true,
       defaults: {
-        initialValues: {
-          search: '',
-          status: '',
-          minPrice: 0,
-          maxPrice: 0,
-          rating: 0,
-        },
         resetValues: {
-          search: 'reset',
-          status: 'false',
+          search: '',
+          status: 'true',
           minPrice: 100,
           maxPrice: 10000,
           rating: 3.5,
@@ -123,8 +117,6 @@ const ProductControl: React.FC = () => {
     },
   });
 
-  console.log('filtesrs', filters);
-  console.log('products', products);
   // Handler for filter changes
   const handleFilterChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>

@@ -23,6 +23,7 @@ export interface FetchConfig {
 
   /**
    * Condition to determine if fetch should occur
+   * @default true
    * @returns boolean or Promise<boolean>
    */
   shouldFetch?: (filters: Record<string, any>) => boolean | Promise<boolean>;
