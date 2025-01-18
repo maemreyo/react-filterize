@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useMemo } from 'react';
 import debounce from 'lodash/debounce';
 import { FilterConfig, FilterSource } from '../types';
 import { withRetry } from '../utils/retry';
-import { FetchState } from '../utils/state';
+import { FetchState } from '../types/fetch';
 
 export const useFetchState = <TConfig extends FilterConfig[]>({
   filters,

@@ -1,5 +1,5 @@
-import { compress, decompress } from '../../utils/compression';
-import { StorageConfig, StorageData } from '../types';
+import { compress, decompress } from '../../compression';
+import { StorageConfig, StorageData } from '../../../types/storage';
 
 export class StorageManager {
   private config: Required<StorageConfig>;

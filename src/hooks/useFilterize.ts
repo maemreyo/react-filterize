@@ -5,7 +5,7 @@ import {
   UseFilterizeReturn,
   FilterValues,
 } from '../types';
-import { StorageManager } from '../storage/adapters/storageManager';
+import { StorageManager } from '../utils/storage/adapters/storageManager';
 import { detectCircularDependencies } from '../utils/dependency';
 import { serializeFilters, deserializeFilters } from '../utils/serialization';
 import { UrlManager } from '../utils/url';

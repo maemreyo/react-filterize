@@ -39,6 +39,8 @@ const ProductControl: React.FC = () => {
     addFilter({
       key: 'search',
       type: ValueTypes.STRING,
+      defaultValue: 'laptop',
+      transform: (value: string) => value.toLowerCase(),
     }),
     addFilter({
       key: 'status',
@@ -60,7 +62,6 @@ const ProductControl: React.FC = () => {
 
   // Mock API function
   const fetch = async (filters: any) => {
-    console.log('[fetch] Received filters:', filters);
     const delay = Math.random() * 1000 + 500;
     await new Promise(resolve => setTimeout(resolve, delay));
 
@@ -92,28 +93,7 @@ const ProductControl: React.FC = () => {
     config,
     fetch,
     options: {
-      url: true,
-      autoFetch: true,
-      defaults: {
-        resetValues: {
-          search: '',
-          status: 'true',
-          minPrice: 100,
-          maxPrice: 10000,
-          rating: 3.5,
-        },
-      },
-      fetch: {
-        fetchOnEmpty: true,
-        // requiredFilters: ['rating'],
-        // onMissingRequired: missingFilters => {
-        //   console.log('Missing required filters:', missingFilters);
-        // },
-      },
-      // storage: {
-      //   type: 'local',
-      //   include: ['search'],
-      // },
+      // `options` go here
     },
   });
 

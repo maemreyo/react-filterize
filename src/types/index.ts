@@ -1,6 +1,5 @@
-import { StorageConfig } from '../storage/types';
-import { FetchConfig } from '../utils/fetch';
-import { FetchState } from '../utils/state';
+import { StorageConfig } from './storage';
+import { FetchConfig, FetchState } from './fetch';
 import { inferValueTypeFromValue } from '../utils/typing';
 import { UrlConfig } from './url';
 

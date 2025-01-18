@@ -1,4 +1,4 @@
-import { StorageAdapter, SyncStorageAdapter } from '../types';
+import { StorageAdapter, SyncStorageAdapter } from '../../../types/storage';
 
 export class MemoryStorageAdapter implements SyncStorageAdapter {
   private storage: Map<string, string>;

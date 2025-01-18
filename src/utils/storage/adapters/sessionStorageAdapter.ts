@@ -1,6 +1,7 @@
-import { StorageAdapter, SyncStorageAdapter } from '../types';
+// adapters/sessionStorageAdapter.ts
+import { StorageAdapter, SyncStorageAdapter } from '../../../types/storage';
 
-export class LocalStorageAdapter implements SyncStorageAdapter {
+export class SessionStorageAdapter implements SyncStorageAdapter {
   private prefix: string;
 
   constructor(prefix: string = '') {
@@ -28,20 +29,20 @@ export class LocalStorageAdapter implements SyncStorageAdapter {
   }
 
   getItemSync(key: string): string | null {
-    return localStorage.getItem(this.getKey(key));
+    return sessionStorage.getItem(this.getKey(key));
   }
 
   setItemSync(key: string, value: string): void {
-    localStorage.setItem(this.getKey(key), value);
+    sessionStorage.setItem(this.getKey(key), value);
   }
 
   removeItemSync(key: string): void {
-    localStorage.removeItem(this.getKey(key));
+    sessionStorage.removeItem(this.getKey(key));
   }
 
   clearSync(): void {
-    Object.keys(localStorage)
+    Object.keys(sessionStorage)
       .filter(key => key.startsWith(this.prefix))
-      .forEach(key => localStorage.removeItem(key));
+      .forEach(key => sessionStorage.removeItem(key));
   }
 }
