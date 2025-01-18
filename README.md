@@ -7,6 +7,8 @@
 
 `@matthew.ngo/react-filterize` is a React library that provides hooks and utility functions to easily manage and synchronize filter states across URLs, local storage, and API calls.
 
+View [Demo here](https://codesandbox.io/p/sandbox/react-filterize-8fd7mt)
+
 ## Table of Contents
 
 - [Installation](#installation)
