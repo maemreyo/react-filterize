@@ -1,13 +1,13 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom/client';
 import ProductControl from './ProductControl';
-// import Demo from './Demo';
+import FilterizeDemo from './FilterizeDemo';
 
 const App = () => {
   return (
     <div>
-      <ProductControl />
-      {/* <Demo /> */}
+      {/* <ProductControl /> */}
+      <FilterizeDemo />
     </div>
   );
 };
