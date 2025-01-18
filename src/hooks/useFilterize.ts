@@ -9,10 +9,11 @@ import { StorageManager } from '../storage/adapters/storageManager';
 import { detectCircularDependencies } from '../utils/dependency';
 import { serializeFilters, deserializeFilters } from '../utils/serialization';
 import { UrlManager } from '../utils/url';
-import { useEnhancedFilterHistory } from './filterize/useEnhancedHistory';
-import { useFetchState } from './filterize/useFetchState';
-import { useFilterSync } from './filterize/useFilterSync';
-import { useFilterValues } from './filterize/useFilterValues';
+import { useEnhancedFilterHistory } from './useEnhancedHistory';
+import { useFetchState } from './useFetchState';
+import { useFilterSync } from './useFilterSync';
+import { useFilterValues } from './useFilterValues';
+import { isEmpty } from 'lodash';
 
 export const useFilterize = <TConfig extends FilterConfig[]>({
   config: fConfig,
@@ -32,29 +33,42 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
 
   const memoizedOptions = useMemo(
     () => ({
-      syncUrl: false,
-      urlKey: 'filters',
-      encode: true,
-      storage: {
-        type: 'none' as const,
-      },
       cacheTimeout: 5 * 60 * 1000,
       autoFetch: true,
       ...options,
-      fetch: {
-        debounceTime: 300,
-        fetchOnEmpty: true,
-        defaultValues: {},
-        dependencies: [],
-        requiredFilters: [],
-        shouldFetch: () => true,
-        ...options.fetch,
+      url: {
+        key: 'filters',
+        encode: true,
+        mergeParams: true,
+        namespace: 'ogn-filters',
+        transformers: {},
+        ...(options.url && typeof options.url === 'boolean' ? {} : options.url),
+      },
+      storage: {
+        type: 'none' as const,
+        ...options.storage,
       },
       retry: {
         attempts: 3,
         delay: 1000,
         backoff: true,
         ...options.retry,
+      },
+      transform: {
+        input: (data: any) => data,
+        output: (data: any) => data,
+        ...options.transform,
+      },
+      fetch: {
+        dependencies: [],
+        debounceTime: 300,
+        fetchOnEmpty: true,
+        requiredFilters: [],
+        shouldFetch: () => true,
+        beforeFetch: filters => filters,
+        onMissingRequired: () => {},
+        onFetchPrevented: () => {},
+        ...options.fetch,
       },
     }),
     [options]
@@ -193,21 +207,21 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     (data: { filters: string; groups?: string[] }) => {
       const importedFilters = deserializeFilters(
         data.filters,
-        memoizedOptions.encode,
+        memoizedOptions.url.encode,
         fConfig
       );
       setFilters(importedFilters as Partial<FilterValues<TConfig>>);
     },
-    [memoizedOptions.encode, fConfig, setFilters]
+    [memoizedOptions.url.encode, fConfig, setFilters]
   );
 
   const clearStorage = useCallback(async () => {
     await storageManager.clear();
-    if (!memoizedOptions.syncUrl) {
+    if (!memoizedOptions.url || isEmpty(memoizedOptions.url)) {
       setFilters({});
       setFilterSource('default');
     }
-  }, [storageManager, memoizedOptions.syncUrl, setFilters, setFilterSource]);
+  }, [storageManager, memoizedOptions.url, setFilters, setFilterSource]);
 
   // Return all the necessary values and functions
   return {

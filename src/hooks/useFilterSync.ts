@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { FilterConfig, FilterValues } from '../../types';
-import { deserializeFilters } from '../../utils/serialization';
+import { FilterConfig, FilterValues } from '../types';
+import { deserializeFilters } from '../utils/serialization';
 
 export const useFilterSync = <TConfig extends FilterConfig[]>({
   filters,
@@ -13,10 +13,10 @@ export const useFilterSync = <TConfig extends FilterConfig[]>({
 }) => {
   // URL synchronization
   useEffect(() => {
-    if (options.syncUrl) {
+    if (options.url || options.url.key) {
       const handleUrlChange = () => {
         const urlParams = new URLSearchParams(window.location.search);
-        const encodedFilters = urlParams.get(options.urlKey);
+        const encodedFilters = urlParams.get(options.url.key);
 
         if (encodedFilters) {
           const urlFilters = deserializeFilters(

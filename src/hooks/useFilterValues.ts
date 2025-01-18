@@ -1,7 +1,7 @@
 import { isEmpty } from 'lodash';
 import { useState, useCallback, useMemo } from 'react';
-import { FilterConfig, FilterSource, FilterValues } from '../../types';
-import { convertInputValue, serializeFilters } from '../../utils/serialization';
+import { FilterConfig, FilterSource, FilterValues } from '../types';
+import { convertInputValue, serializeFilters } from '../utils/serialization';
 
 export const useFilterValues = <TConfig extends FilterConfig[]>({
   config,
@@ -50,10 +50,10 @@ export const useFilterValues = <TConfig extends FilterConfig[]>({
         } as Partial<FilterValues<TConfig>>;
 
         // Update URL if enabled
-        if (options.syncUrl) {
+        if (options.url || options.url.key) {
           const urlParams = new URLSearchParams(window.location.search);
           urlParams.set(
-            options.urlKey,
+            options.url.key,
             serializeFilters(newFilters, options.encode)
           );
           const newUrl = `${window.location.pathname}?${urlParams.toString()}`;

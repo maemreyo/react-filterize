@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { FilterHistory, FilterHistoryState } from '../../types';
+import { FilterHistory, FilterHistoryState } from '../types';
 
 export const useFilterHistory = <T extends Record<string, any>>(
   initialState: FilterHistoryState<T>

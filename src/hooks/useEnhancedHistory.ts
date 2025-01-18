@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useFilterHistory as useBaseFilterHistory } from './useFilterHistory';
-import { serializeFilters } from '../../utils/serialization';
+import { serializeFilters } from '../utils/serialization';
 
 export const useEnhancedFilterHistory = ({ filters, options }) => {
   const {
@@ -17,10 +17,10 @@ export const useEnhancedFilterHistory = ({ filters, options }) => {
 
   const updateHistoryForFilters = useCallback(
     (newFilters: any) => {
-      if (options.syncUrl) {
+      if (options.url || options.url.key) {
         const urlParams = new URLSearchParams(window.location.search);
         urlParams.set(
-          options.urlKey,
+          options.url.key,
           serializeFilters(newFilters, options.encode)
         );
         const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
