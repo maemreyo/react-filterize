@@ -22,12 +22,55 @@ import { detectCircularDependencies } from '../utils/dependency';
 import { UrlManager } from '../utils/url';
 import { FetchState } from '../utils/state';
 import { FetchConfig } from '../utils/fetch';
+import { isEmpty } from '../utils/object';
 
 export const useFilterize = <TConfig extends FilterConfig[]>({
   config: fConfig,
   options = {},
   fetch,
 }: UseFilterizeProps<TConfig>): UseFilterizeReturn<TConfig> => {
+  // Memoize default configs
+  const memoizedDefaultsConfig = useMemo(
+    () => ({
+      initialValues: {},
+      resetValues: {},
+      onReset: undefined,
+      ...options.defaults,
+    }),
+    [options.defaults]
+  );
+
+  // Get initial values from different sources with priority
+  const getInitialValues = useCallback(() => {
+    // 1. Config-level defaults (from FilterConfig.defaultValue)
+    const configDefaults = fConfig.reduce((acc, filter) => {
+      if (filter.defaultValue !== undefined) {
+        // @ts-ignore
+        acc[filter.key] = filter.defaultValue;
+      }
+      return acc;
+    }, {} as Partial<FilterValues<TConfig>>);
+
+    // 2. Override with initialValues from DefaultValuesConfig if provided
+    return {
+      ...configDefaults,
+      ...memoizedDefaultsConfig.initialValues,
+    };
+  }, [fConfig, memoizedDefaultsConfig.initialValues]);
+
+  // Get reset values
+  const getResetValues = useCallback(() => {
+    if (memoizedDefaultsConfig.onReset) {
+      return memoizedDefaultsConfig.onReset();
+    }
+
+    // If no custom reset handler, use resetValues or fall back to initialValues
+    return {
+      ...getInitialValues(),
+      ...memoizedDefaultsConfig.resetValues,
+    };
+  }, [memoizedDefaultsConfig, getInitialValues]);
+
   // Initialize URL manager if URL sync is enabled
   const urlManager = useMemo(() => {
     if (!options.url) return null;
@@ -42,7 +85,6 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       ({
         debounceTime: 300,
         fetchOnEmpty: false,
-        defaultValues: {},
         dependencies: [],
         shouldFetch: () => true,
         requiredFilters: [],
@@ -100,6 +142,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       }),
     [options.transform]
   );
+
   const [filterSource, setFilterSource] = useState<FilterSource>('none');
   const [fetchState, setFetchState] = useState<FetchState>({
     isInitialFetch: true,
@@ -124,50 +167,27 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     [memoizedFetchOptions.requiredFilters]
   );
 
-  // Helper function to deserialize URL filters
-  const deserializeUrlFilters = useCallback(
-    (encodedFilters: string | null) => {
-      if (!encodedFilters) return {};
-      return deserializeFilters(
-        encodedFilters,
-        encode,
-        memoizedFiltersConfig
-      ) as Partial<FilterValues<TConfig>>;
-    },
-    [encode, memoizedFiltersConfig]
-  );
-
-  const getDefaultValues = useCallback(() => {
-    return fConfig.reduce((acc, filter) => {
-      if (filter.defaultValue !== undefined) {
-        // @ts-ignore
-        acc[filter.key] = filter.defaultValue;
-      }
-      return acc;
-    }, {} as Partial<FilterValues<TConfig>>);
-  }, [fConfig]);
-
   // State management
   const [filters, setFilters] = useState<Partial<FilterValues<TConfig>>>(() => {
-    // Check URL first if enabled
+    // 1. Try URL params first
     if (urlManager) {
       const urlFilters = urlManager.getFiltersFromUrl();
-      if (urlFilters) {
+      if (urlFilters && !isEmpty(urlFilters)) {
         setFilterSource('url');
         return urlFilters as Partial<FilterValues<TConfig>>;
       }
     }
 
-    // Then check storage
+    // 2. Try storage
     const storedData = storageManager.loadSync();
-    if (storedData?.filters) {
+    if (storedData?.filters && !isEmpty(storedData.filters)) {
       setFilterSource('storage');
       return storedData.filters as Partial<FilterValues<TConfig>>;
     }
 
-    // Finally use default values from config
+    // 3. Use initial values
     setFilterSource('default');
-    return getDefaultValues();
+    return getInitialValues();
   });
 
   const [loading, setLoading] = useState(false);
@@ -542,30 +562,30 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     }
   }, [storageManager, syncUrl]);
 
-  // Update reset function
   const reset = useCallback(() => {
-    const defaultValues = (fetchOptions.defaultValues as any) || ({} as any);
-    setFilters(defaultValues);
+    const resetValues = getResetValues();
+    setFilters(resetValues as any);
     setFilterSource('default');
 
-    // Clear URL if URL sync is enabled
+    // Update URL if needed
     if (urlManager) {
-      if (Object.keys(defaultValues).length > 0) {
-        urlManager.updateUrl(defaultValues);
+      if (!isEmpty(resetValues)) {
+        urlManager.updateUrl(resetValues);
       } else {
         urlManager.clearUrl();
       }
     }
 
-    if (Object.keys(defaultValues).length > 0) {
+    // Update storage if needed
+    if (!isEmpty(resetValues)) {
       storageManager.save({
-        filters: defaultValues,
+        filters: resetValues,
         timestamp: Date.now(),
       });
     } else {
       clearStorage();
     }
-  }, [fetchOptions, clearStorage, urlManager]);
+  }, [getResetValues, urlManager, clearStorage]);
 
   return {
     filters,

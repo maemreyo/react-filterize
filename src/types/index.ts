@@ -75,6 +75,7 @@ export interface BaseFilterConfig {
   disabled?: boolean;
 }
 
+// Interface cho config với explicit type
 export interface FilterConfigWithType<T extends ValueTypeKey>
   extends BaseFilterConfig {
   type: T;
@@ -86,7 +87,8 @@ export interface FilterConfigWithType<T extends ValueTypeKey>
   transform?: (value: OutputValueType[T]) => any;
 }
 
-export interface FilterConfigWithoutType<T extends DefaultValue>
+// Interface cho config với implicit type từ defaultValue
+export interface FilterConfigWithDefaultValue<T extends DefaultValue>
   extends BaseFilterConfig {
   defaultValue: T;
   type?: InferValueType<NonNullable<T>>;
@@ -97,9 +99,31 @@ export interface FilterConfigWithoutType<T extends DefaultValue>
   transform?: (value: T extends null | undefined ? any : T) => any;
 }
 
+// Union type cho FilterConfig
 export type FilterConfig<T = any> =
   | FilterConfigWithType<ValueTypeKey>
-  | FilterConfigWithoutType<DefaultValue>;
+  | FilterConfigWithDefaultValue<DefaultValue>;
+
+// Helper function để tạo filter config
+export function addFilter<T extends ValueTypeKey>(
+  config: FilterConfigWithType<T>
+): FilterConfig;
+export function addFilter<T extends DefaultValue>(
+  config: Omit<FilterConfigWithDefaultValue<T>, 'type'> & {
+    type?: InferValueType<NonNullable<T>>;
+  }
+): FilterConfig;
+export function addFilter(config: any): FilterConfig {
+  if ('type' in config) {
+    return config as FilterConfigWithType<ValueTypeKey>;
+  }
+
+  const inferredType = inferValueTypeFromValue(config.defaultValue);
+  return {
+    ...config,
+    type: config.type || inferredType,
+  } as FilterConfigWithDefaultValue<DefaultValue>;
+}
 
 function isStringArray(arr: unknown[]): arr is (string | null)[] {
   return arr.some(item => item !== null && typeof item === 'string');
@@ -138,20 +162,6 @@ function inferValueTypeFromValue(value: DefaultValue): ValueTypeKey {
   return ValueTypes.STRING;
 }
 
-export function addFilter<
-  T extends DefaultValue,
-  Type extends ValueTypeKey = InferValueType<NonNullable<T>>
->(
-  config: Omit<FilterConfigWithoutType<T>, 'type'> & { type?: Type }
-): FilterConfig {
-  const inferredType =
-    config.type || inferValueTypeFromValue(config.defaultValue);
-  return {
-    ...config,
-    type: inferredType,
-  } as FilterConfig;
-}
-
 export type FilterHook<T extends ValueTypeKey> = {
   value: OutputValueType[T];
   setValue: (value: OutputValueType[T]) => void;
@@ -171,7 +181,7 @@ export type FilterOutput<
   T extends FilterConfig
 > = T extends FilterConfigWithType<infer Type>
   ? OutputValueType[Type]
-  : T extends FilterConfigWithoutType<infer Value>
+  : T extends FilterConfigWithDefaultValue<infer Value>
   ? Value
   : never;
 
@@ -189,6 +199,15 @@ export type FilterValues<T extends FilterConfig[]> = {
   [P in ExtractKeys<T[number]>]: FilterOutput<GetConfigForKey<T, P>>;
 };
 
+export interface DefaultValuesConfig {
+  // Giá trị mặc định khi khởi tạo
+  initialValues?: Record<string, any>;
+  // Giá trị khi reset
+  resetValues?: Record<string, any>;
+  // Handler để override logic reset mặc định
+  onReset?: () => Record<string, any>;
+}
+
 export interface UseFilterizeProps<TConfig extends FilterConfig[]> {
   config: TConfig;
   fetch: (filters: Partial<FilterValues<TConfig>>) => Promise<any>;
@@ -200,6 +219,7 @@ export interface UseFilterizeProps<TConfig extends FilterConfig[]> {
     retry?: RetryConfig;
     transform?: TransformConfig;
     fetch?: FetchConfig;
+    defaults?: DefaultValuesConfig;
   };
 }
 

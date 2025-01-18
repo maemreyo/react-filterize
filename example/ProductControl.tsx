@@ -3,7 +3,11 @@ import styled from 'styled-components';
 import Filters from './Filters';
 import ProductsGrid from './ProductGrid';
 import { dummyData } from './data';
-import { useFilterize, addFilter } from '@matthew.ngo/react-filterize';
+import {
+  useFilterize,
+  addFilter,
+  ValueTypes,
+} from '@matthew.ngo/react-filterize';
 
 const Container = styled.div`
   padding: 20px;
@@ -34,30 +38,23 @@ const ProductControl: React.FC = () => {
   const config = [
     addFilter({
       key: 'search',
-      label: 'Search',
-      defaultValue: 'aaa',
-      transform: (value: string) => value.toLowerCase(),
+      type: ValueTypes.STRING,
     }),
     addFilter({
       key: 'status',
-      label: 'Status',
-      defaultValue: '',
-      transform: (value: string) => value === 'true',
+      type: ValueTypes.STRING,
     }),
     addFilter({
       key: 'minPrice',
-      label: 'Min Price',
-      defaultValue: 0,
+      type: ValueTypes.NUMBER,
     }),
     addFilter({
       key: 'maxPrice',
-      label: 'Max Price',
-      defaultValue: 0,
+      type: ValueTypes.NUMBER,
     }),
     addFilter({
       key: 'rating',
-      label: 'Min Rating',
-      defaultValue: 0,
+      type: ValueTypes.NUMBER,
     }),
   ];
 
@@ -96,20 +93,33 @@ const ProductControl: React.FC = () => {
     options: {
       url: true,
       autoFetch: true,
+      defaults: {
+        initialValues: {
+          search: '',
+          status: '',
+          minPrice: 0,
+          maxPrice: 0,
+          rating: 0,
+        },
+        resetValues: {
+          search: 'reset',
+          status: 'false',
+          minPrice: 100,
+          maxPrice: 10000,
+          rating: 3.5,
+        },
+      },
       fetch: {
         fetchOnEmpty: true,
-        defaultValues: {
-          search: 'laptop',
-        },
         // requiredFilters: ['rating'],
         // onMissingRequired: missingFilters => {
         //   console.log('Missing required filters:', missingFilters);
         // },
       },
-      storage: {
-        type: 'local',
-        include: ['search'],
-      },
+      // storage: {
+      //   type: 'local',
+      //   include: ['search'],
+      // },
     },
   });
 

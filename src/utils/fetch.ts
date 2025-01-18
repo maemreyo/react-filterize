@@ -11,11 +11,6 @@ export interface FetchConfig {
   debounceTime?: number;
 
   /**
-   * Default filters to use when resetting
-   */
-  defaultValues?: Record<string, any>;
-
-  /**
    * Whether to fetch data when filters are empty
    * @default false
    */
