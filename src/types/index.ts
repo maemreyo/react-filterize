@@ -226,6 +226,7 @@ export interface UseFilterizeReturn<TConfig extends FilterConfig[]> {
   };
   fetchState: FetchState;
   validateRequiredFilters: any;
+  bulkUpdateFilter: (updates: Partial<FilterValues<TConfig>>) => void;
 }
 
 export interface RetryConfig {

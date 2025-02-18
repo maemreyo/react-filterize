@@ -69,6 +69,45 @@ export const useFilterValues = <TConfig extends FilterConfig[]>({
     [config, options]
   );
 
+  const bulkUpdateFilter = useCallback(
+    (updates: Partial<FilterValues<TConfig>>) => {
+      const convertedUpdates = Object.entries(updates).reduce(
+        (acc, [key, value]) => {
+          const filterConfig = config.find(c => c.key === key);
+          return {
+            ...acc,
+            [key]: convertInputValue(value, filterConfig?.type),
+          };
+        },
+        {} as Partial<FilterValues<TConfig>>
+      );
+
+      setFilters(prev => {
+        const newFilters = {
+          ...prev,
+          ...convertedUpdates,
+        };
+
+        // Update URL if enabled
+        if (options.url || options.url.key) {
+          const urlParams = new URLSearchParams(window.location.search);
+          urlParams.set(
+            options.url.key,
+            serializeFilters(newFilters, options.encode)
+          );
+          const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
+          window.history.pushState({}, '', newUrl);
+          setFilterSource('url');
+        } else {
+          setFilterSource('storage');
+        }
+
+        return newFilters;
+      });
+    },
+    [config, options]
+  );
+
   const reset = useCallback(() => {
     const resetValues = getResetValues();
     setFilters(resetValues as any);
@@ -98,6 +137,7 @@ export const useFilterValues = <TConfig extends FilterConfig[]>({
     filters,
     filterSource,
     updateFilter,
+    bulkUpdateFilter,
     setFilters,
     setFilterSource,
     reset,

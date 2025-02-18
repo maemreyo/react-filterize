@@ -129,6 +129,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     setFilters,
     setFilterSource,
     reset,
+    bulkUpdateFilter,
   } = useFilterValues<TConfig>({
     config: fConfig,
     options: memoizedOptions,
@@ -227,6 +228,7 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
   return {
     filters,
     updateFilter,
+    bulkUpdateFilter,
     loading,
     error,
     data,
