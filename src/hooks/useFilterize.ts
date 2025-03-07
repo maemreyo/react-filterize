@@ -191,9 +191,10 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
       debouncedFetch();
     }
   }, [
-    ...(memoizedOptions.fetch.dependencies || []),
-    filters,
+    JSON.stringify(memoizedOptions.fetch.dependencies),
+    JSON.stringify(filters),
     memoizedOptions.autoFetch,
+    debouncedFetch
   ]);
 
   // Export/Import functions
