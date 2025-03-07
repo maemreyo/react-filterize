@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useEffect } from 'react';
+import { useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   FilterConfig,
   UseFilterizeProps,
@@ -14,13 +14,13 @@ import { useFetchState } from './useFetchState';
 import { useFilterSync } from './useFilterSync';
 import { useFilterValues } from './useFilterValues';
 import { isEmpty } from 'lodash';
+import { areDepArraysEqual, areObjectsEqual } from '../utils/object';
 
 export const useFilterize = <TConfig extends FilterConfig[]>({
   config: fConfig,
   options = {},
   fetch,
 }: UseFilterizeProps<TConfig>): UseFilterizeReturn<TConfig> => {
-  // Memoize configurations
   const memoizedDefaultsConfig = useMemo(
     () => ({
       initialValues: {},
@@ -74,7 +74,6 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     [options]
   );
 
-  // Initialize managers
   const urlManager = useMemo(() => {
     if (!options.url) return null;
     return new UrlManager(typeof options.url === 'boolean' ? {} : options.url);
@@ -85,7 +84,6 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     [memoizedOptions.storage]
   );
 
-  // Helper functions
   const getInitialValues = useCallback(() => {
     const configDefaults = fConfig.reduce((acc, filter) => {
       if (filter.defaultValue !== undefined) {
@@ -121,7 +119,6 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     [memoizedOptions.fetch.requiredFilters]
   );
 
-  // Use custom hooks
   const {
     filters,
     filterSource,
@@ -173,31 +170,69 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     },
   });
 
-  // Check for circular dependencies on mount
   useEffect(() => {
     detectCircularDependencies(fConfig);
   }, []);
 
-  // Auto-fetch effect
-  useEffect(() => {
-    console.log('AutoFetch effect triggered', {
-      autoFetch: memoizedOptions.autoFetch,
-      filters,
-      dependencies: memoizedOptions.fetch.dependencies,
-    });
+  const isFirstMount = useRef(true);
 
-    if (memoizedOptions.autoFetch) {
-      console.log('Calling debouncedFetch due to autoFetch');
-      debouncedFetch();
+  const hasFetchedRef = useRef(false);
+
+  const prevFiltersRef = useRef<any>(null);
+
+  const prevDepsRef = useRef<any[]>([]);
+
+  const depsRef = useRef<any[]>(memoizedOptions.fetch.dependencies || []);
+
+  useEffect(() => {
+    const currentDeps = memoizedOptions.fetch.dependencies || [];
+
+    const depsChanged = !areDepArraysEqual(prevDepsRef.current, currentDeps);
+
+    if (depsChanged) {
+      prevDepsRef.current = JSON.parse(JSON.stringify(currentDeps));
+      depsRef.current = currentDeps;
+
+      if (
+        !isFirstMount.current &&
+        hasFetchedRef.current &&
+        memoizedOptions.autoFetch
+      ) {
+        console.log('Dependencies changed, triggering fetch');
+        debouncedFetch();
+      }
     }
   }, [
-    JSON.stringify(memoizedOptions.fetch.dependencies),
-    JSON.stringify(filters),
+    memoizedOptions.fetch.dependencies,
+    debouncedFetch,
     memoizedOptions.autoFetch,
-    debouncedFetch
   ]);
 
-  // Export/Import functions
+  useEffect(() => {
+    if (isFirstMount.current) {
+      console.log('Initial mount, setting up fetch');
+
+      if (memoizedOptions.autoFetch) {
+        console.log('Auto-fetching on initial mount');
+        debouncedFetch();
+        hasFetchedRef.current = true;
+      }
+
+      isFirstMount.current = false;
+      prevFiltersRef.current = { ...filters };
+      return;
+    }
+
+    const filtersChanged = !areObjectsEqual(prevFiltersRef.current, filters);
+
+    if (filtersChanged && memoizedOptions.autoFetch) {
+      console.log('Filters changed, triggering fetch');
+      debouncedFetch();
+      hasFetchedRef.current = true;
+      prevFiltersRef.current = { ...filters };
+    }
+  }, [filters, memoizedOptions.autoFetch, debouncedFetch]);
+
   const exportFilters = useCallback(
     () => ({
       filters: serializeFilters(filters),
@@ -225,7 +260,6 @@ export const useFilterize = <TConfig extends FilterConfig[]>({
     }
   }, [storageManager, memoizedOptions.url, setFilters, setFilterSource]);
 
-  // Return all the necessary values and functions
   return {
     filters,
     updateFilter,

@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { FilterConfig, FilterValues } from '../types';
 import { deserializeFilters } from '../utils/serialization';
+import { areFiltersEqual } from '../utils/object';
 
 export const useFilterSync = <TConfig extends FilterConfig[]>({
   filters,
@@ -11,7 +12,10 @@ export const useFilterSync = <TConfig extends FilterConfig[]>({
   setFilterSource,
   config,
 }) => {
-  // URL synchronization
+  const isFirstRender = useRef(true);
+
+  const prevFiltersRef = useRef(filters);
+
   useEffect(() => {
     if (options.url || options.url.key) {
       const handleUrlChange = () => {
@@ -27,7 +31,6 @@ export const useFilterSync = <TConfig extends FilterConfig[]>({
           setFilters(urlFilters as Partial<FilterValues<TConfig>>);
           setFilterSource('url');
         } else if (options.storage.type !== 'none') {
-          // Fallback to storage if URL is empty
           const storedData = storageManager.loadSync();
           if (storedData?.filters) {
             setFilters(storedData.filters as Partial<FilterValues<TConfig>>);
@@ -41,24 +44,36 @@ export const useFilterSync = <TConfig extends FilterConfig[]>({
     }
   }, [options, config, storageManager]);
 
-  // Update URL when filters change
   useEffect(() => {
-    if (urlManager && options.filterSource !== 'url') {
+    if (
+      !isFirstRender.current &&
+      urlManager &&
+      options.filterSource !== 'url'
+    ) {
       urlManager.updateUrl(filters);
     }
-  }, [filters, options.filterSource]);
 
-  // Storage synchronization
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+    }
+  }, [filters, options.filterSource, urlManager]);
+
   useEffect(() => {
-    const saveToStorage = async () => {
-      if (options.filterSource !== 'url' && options.storage.type !== 'none') {
-        await storageManager.save({
-          filters,
-          timestamp: Date.now(),
-        });
-      }
-    };
+    const filtersChanged = !areFiltersEqual(prevFiltersRef.current, filters);
 
-    saveToStorage();
-  }, [filters, options]);
+    if (!isFirstRender.current && filtersChanged) {
+      const saveToStorage = async () => {
+        if (options.filterSource !== 'url' && options.storage.type !== 'none') {
+          await storageManager.save({
+            filters,
+            timestamp: Date.now(),
+          });
+        }
+      };
+
+      saveToStorage();
+
+      prevFiltersRef.current = { ...filters };
+    }
+  }, [filters, options, storageManager]);
 };

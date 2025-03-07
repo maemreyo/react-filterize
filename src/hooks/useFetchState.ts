@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo } from 'react';
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import debounce from 'lodash/debounce';
 import { FilterConfig, FilterSource } from '../types';
 import { withRetry } from '../utils/retry';
@@ -40,7 +40,6 @@ export const useFetchState = <TConfig extends FilterConfig[]>({
     console.log('Current options:', options);
 
     try {
-      // Check empty filters condition
       const shouldSkipEmpty =
         !options.fetch.fetchOnEmpty && Object.keys(filters).length === 0;
 
@@ -61,7 +60,6 @@ export const useFetchState = <TConfig extends FilterConfig[]>({
         return;
       }
 
-      // Check required filters
       const missingFilters = validateRequiredFilters(filters);
       console.log('Required filters validation:', {
         missingFilters,
@@ -83,7 +81,6 @@ export const useFetchState = <TConfig extends FilterConfig[]>({
         return;
       }
 
-      // Check shouldFetch condition
       let shouldProceed = true;
       try {
         shouldProceed = (await options.fetch.shouldFetch?.(filters)) ?? true;
@@ -124,7 +121,6 @@ export const useFetchState = <TConfig extends FilterConfig[]>({
       const cacheKey = JSON.stringify(transformedFilters);
       console.log('Cache check with key:', cacheKey);
 
-      // Check cache
       const cachedResult = cache.current.get(cacheKey);
       if (
         cachedResult &&
@@ -141,7 +137,6 @@ export const useFetchState = <TConfig extends FilterConfig[]>({
         return;
       }
 
-      // Process filters with dependency checks
       console.log('Processing filters with dependencies. Config:', config);
       try {
         if (!transformedFilters) {
@@ -187,7 +182,6 @@ export const useFetchState = <TConfig extends FilterConfig[]>({
         const finalFilters = Object.fromEntries(processedFilters);
         console.log('Final processed filters:', finalFilters);
 
-        // Actual API call
         console.log('Making API call with filters:', finalFilters);
         const result = await withRetry(async () => {
           const data = await fetch(filters);
@@ -204,7 +198,6 @@ export const useFetchState = <TConfig extends FilterConfig[]>({
 
         console.log('Fetch completed successfully:', result);
 
-        // Update cache
         cache.current.set(cacheKey, {
           data: result,
           timestamp: Date.now(),
@@ -244,9 +237,19 @@ export const useFetchState = <TConfig extends FilterConfig[]>({
     }
   }, [filters, options, filterSource, config, fetch, validateRequiredFilters]);
 
+  const stableFetchRef = useRef(fetchFilteredData);
+
+  useEffect(() => {
+    stableFetchRef.current = fetchFilteredData;
+  }, [fetchFilteredData]);
+
+  const stableFetch = useCallback(() => {
+    return stableFetchRef.current();
+  }, []);
+
   const debouncedFetch = useMemo(
-    () => debounce(fetchFilteredData, options.fetch.debounceTime),
-    [fetchFilteredData, options.fetch.debounceTime]
+    () => debounce(stableFetch, options.fetch.debounceTime),
+    [stableFetch, options.fetch.debounceTime]
   );
 
   return {
